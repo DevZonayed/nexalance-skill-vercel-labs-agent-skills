@@ -937,6 +937,22 @@
   },
   {
     "ruleId": "",
+    "ruleTitle": "Parallel Nested Data Fetching with Component Composition",
+    "type": "bad",
+    "code": "const chats = await Promise.all(\n  chatIds.map(id => getChat(id))\n)\n\nconst chatAuthors = await Promise.all(\n  chats.map(chat => getUser(chat.author))\n)",
+    "language": "tsx",
+    "description": "a single slow item blocks all nested fetches"
+  },
+  {
+    "ruleId": "",
+    "ruleTitle": "Parallel Nested Data Fetching with Component Composition",
+    "type": "good",
+    "code": "const chatAuthors = await Promise.all(\n  chatIds.map(id => getChat(id).then(chat => getUser(chat.author)))\n)",
+    "language": "tsx",
+    "description": "each item chains its own nested fetch"
+  },
+  {
+    "ruleId": "",
     "ruleTitle": "Minimize Serialization at RSC Boundaries",
     "type": "bad",
     "code": "async function Page() {\n  const user = await fetchUser()  // 50 fields\n  return <Profile user={user} />\n}\n\n'use client'\nfunction Profile({ user }: { user: User }) {\n  return <div>{user.name}</div>  // uses 1 field\n}",

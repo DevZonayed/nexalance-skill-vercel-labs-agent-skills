@@ -39,8 +39,9 @@ Comprehensive performance optimization guide for React and Next.js applications,
    - 3.4 [Hoist Static I/O to Module Level](#34-hoist-static-io-to-module-level)
    - 3.5 [Minimize Serialization at RSC Boundaries](#35-minimize-serialization-at-rsc-boundaries)
    - 3.6 [Parallel Data Fetching with Component Composition](#36-parallel-data-fetching-with-component-composition)
-   - 3.7 [Per-Request Deduplication with React.cache()](#37-per-request-deduplication-with-reactcache)
-   - 3.8 [Use after() for Non-Blocking Operations](#38-use-after-for-non-blocking-operations)
+   - 3.7 [Parallel Nested Data Fetching with Component Composition](#37-parallel-nested-data-fetching-with-component-composition)
+   - 3.8 [Per-Request Deduplication with React.cache()](#38-per-request-deduplication-with-reactcache)
+   - 3.9 [Use after() for Non-Blocking Operations](#39-use-after-for-non-blocking-operations)
 4. [Client-Side Data Fetching](#4-client-side-data-fetching) — **MEDIUM-HIGH**
    - 4.1 [Deduplicate Global Event Listeners](#41-deduplicate-global-event-listeners)
    - 4.2 [Use Passive Event Listeners for Scrolling Performance](#42-use-passive-event-listeners-for-scrolling-performance)
@@ -941,7 +942,37 @@ export default function Page() {
 }
 ```
 
-### 3.7 Per-Request Deduplication with React.cache()
+### 3.7 Parallel Nested Data Fetching with Component Composition
+
+**Impact: CRITICAL (eliminates server-side waterfalls)**
+
+When fetching nested data in parallel, chain dependent fetches within each item's promise so a slow item doesn't block the rest.
+
+**Incorrect: a single slow item blocks all nested fetches**
+
+```tsx
+const chats = await Promise.all(
+  chatIds.map(id => getChat(id))
+)
+
+const chatAuthors = await Promise.all(
+  chats.map(chat => getUser(chat.author))
+)
+```
+
+If one `getChat(id)` out of 100 is extremely slow, the authors of the other 99 chats can't start loading even though their data is ready.
+
+**Correct: each item chains its own nested fetch**
+
+```tsx
+const chatAuthors = await Promise.all(
+  chatIds.map(id => getChat(id).then(chat => getUser(chat.author)))
+)
+```
+
+Each item independently chains `getChat` → `getUser`, so a slow chat doesn't block author fetches for the others.
+
+### 3.8 Per-Request Deduplication with React.cache()
 
 **Impact: MEDIUM (deduplicates within request)**
 
@@ -1007,7 +1038,7 @@ Use `React.cache()` to deduplicate these operations across your component tree.
 
 Reference: [https://react.dev/reference/react/cache](https://react.dev/reference/react/cache)
 
-### 3.8 Use after() for Non-Blocking Operations
+### 3.9 Use after() for Non-Blocking Operations
 
 **Impact: MEDIUM (faster response times)**
 
