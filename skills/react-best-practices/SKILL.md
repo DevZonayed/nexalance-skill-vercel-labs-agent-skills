@@ -60,6 +60,7 @@ Reference these guidelines when:
 - `server-hoist-static-io` - Hoist static I/O (fonts, logos) to module level
 - `server-serialization` - Minimize data passed to client components
 - `server-parallel-fetching` - Restructure components to parallelize fetches
+- `server-parallel-nested-fetching` - Chain nested fetches per item in Promise.all
 - `server-after-nonblocking` - Use after() for non-blocking operations
 
 ### 4. Client-Side Data Fetching (MEDIUM-HIGH)
