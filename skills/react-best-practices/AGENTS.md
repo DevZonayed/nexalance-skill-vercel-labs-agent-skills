@@ -39,7 +39,7 @@ Comprehensive performance optimization guide for React and Next.js applications,
    - 3.4 [Hoist Static I/O to Module Level](#34-hoist-static-io-to-module-level)
    - 3.5 [Minimize Serialization at RSC Boundaries](#35-minimize-serialization-at-rsc-boundaries)
    - 3.6 [Parallel Data Fetching with Component Composition](#36-parallel-data-fetching-with-component-composition)
-   - 3.7 [Parallel Nested Data Fetching with Component Composition](#37-parallel-nested-data-fetching-with-component-composition)
+   - 3.7 [Parallel Nested Data Fetching](#37-parallel-nested-data-fetching)
    - 3.8 [Per-Request Deduplication with React.cache()](#38-per-request-deduplication-with-reactcache)
    - 3.9 [Use after() for Non-Blocking Operations](#39-use-after-for-non-blocking-operations)
 4. [Client-Side Data Fetching](#4-client-side-data-fetching) — **MEDIUM-HIGH**
@@ -942,7 +942,7 @@ export default function Page() {
 }
 ```
 
-### 3.7 Parallel Nested Data Fetching with Component Composition
+### 3.7 Parallel Nested Data Fetching
 
 **Impact: CRITICAL (eliminates server-side waterfalls)**
 

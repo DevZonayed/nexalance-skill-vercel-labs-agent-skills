@@ -1,11 +1,11 @@
 ---
-title: Parallel Nested Data Fetching with Component Composition
+title: Parallel Nested Data Fetching
 impact: CRITICAL
 impactDescription: eliminates server-side waterfalls
-tags: server, rsc, parallel-fetching, composition
+tags: server, rsc, parallel-fetching, promise-chaining
 ---
 
-## Parallel Nested Data Fetching with Component Composition
+## Parallel Nested Data Fetching
 
 When fetching nested data in parallel, chain dependent fetches within each item's promise so a slow item doesn't block the rest.
 

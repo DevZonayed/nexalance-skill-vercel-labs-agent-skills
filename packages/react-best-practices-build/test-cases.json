@@ -937,7 +937,7 @@
   },
   {
     "ruleId": "",
-    "ruleTitle": "Parallel Nested Data Fetching with Component Composition",
+    "ruleTitle": "Parallel Nested Data Fetching",
     "type": "bad",
     "code": "const chats = await Promise.all(\n  chatIds.map(id => getChat(id))\n)\n\nconst chatAuthors = await Promise.all(\n  chats.map(chat => getUser(chat.author))\n)",
     "language": "tsx",
@@ -945,7 +945,7 @@
   },
   {
     "ruleId": "",
-    "ruleTitle": "Parallel Nested Data Fetching with Component Composition",
+    "ruleTitle": "Parallel Nested Data Fetching",
     "type": "good",
     "code": "const chatAuthors = await Promise.all(\n  chatIds.map(id => getChat(id).then(chat => getUser(chat.author)))\n)",
     "language": "tsx",
