@@ -639,6 +639,9 @@ Or disable specific animations conditionally in JavaScript events by checking th
 **Animations from `flushSync` are skipped:**
 - `flushSync` completes synchronously, which prevents view transitions from running. Use `startTransition` instead.
 
+**Enter/exit not firing in a client component (only updates animate):**
+- `startTransition(() => setState(...))` triggers a Transition, but if the new content isn't behind a `<Suspense>` boundary, React treats the swap as an **update** to the existing tree — not an enter/exit. The `<ViewTransition>` sees its children change but never fully unmounts/remounts, so only `update` animations fire. To get true enter/exit, either conditionally render the `<ViewTransition>` itself (so it mounts/unmounts with the content), or wrap the async content in `<Suspense>` so React can treat the reveal as an insertion.
+
 **Competing / double animations on navigation:**
 - Multiple `<ViewTransition>` components at different tree levels (layout + page + items) all fire simultaneously inside a single `document.startViewTransition`. If a layout-level VT cross-fades the whole page while a page-level VT slides up content, both run at once and fight for attention. Fix: use `default="none"` on the layout-level VT, or remove it entirely if pages manage their own animations. See "How Multiple ViewTransitions Interact" above.
 
