@@ -31,7 +31,7 @@ Route-level transitions (#5) are the lowest priority because the URL change alre
 
 - **Persistent across navigations?** (nav bar, sidebar, header) → Skip VT. Use plain `<Suspense>` if needed.
 - **Expand/collapse that needs to feel spatial?** → Animated collapse with VT + `startTransition`.
-- **Simple show/hide with no spatial meaning?** → `<details>` or conditional render, no VT.
+- **Simple show/hide with no spatial meaning?** → Conditional render, no VT.
 - **Already inside a parent VT?** → Check if `default="none"` is needed to avoid double-animation.
 - **Content that changes on route navigation?** → VT with `default="none"` + explicit triggers.
 
@@ -424,7 +424,7 @@ function AnimatedCollapse({ open, children }) {
 }
 ```
 
-Use it with `startTransition` on the toggle — never with native `<details>`/`<summary>` (which bypasses React state):
+Use it with `startTransition` on the toggle:
 
 ```jsx
 <button onClick={() => startTransition(() => setOpen(o => !o))}>Toggle</button>
@@ -730,9 +730,6 @@ Or disable specific animations conditionally in JavaScript events by checking th
 **Enter/exit not firing in a client component (only updates animate):**
 - `startTransition(() => setState(...))` triggers a Transition, but if the new content isn't behind a `<Suspense>` boundary, React treats the swap as an **update** to the existing tree — not an enter/exit. The `<ViewTransition>` sees its children change but never fully unmounts/remounts, so only `update` animations fire. To get true enter/exit, either conditionally render the `<ViewTransition>` itself (so it mounts/unmounts with the content), or wrap the async content in `<Suspense>` so React can treat the reveal as an insertion.
 
-**ViewTransition not firing on `<details>` toggle:**
-- Native `<details>`/`<summary>` is browser-controlled — open/close bypasses React, so `startTransition` never wraps the toggle and `<ViewTransition>` never fires. This is a trade-off: `<details>` is simpler and more accessible out of the box, but can't be animated with VT. If you need animated expand/collapse, use controlled state with `useState` + `startTransition`. If you don't need the animation, `<details>` is the simpler choice.
-
 **Competing / double animations on navigation:**
 - Multiple `<ViewTransition>` components at different tree levels (layout + page + items) all fire simultaneously inside a single `document.startViewTransition`. If a layout-level VT cross-fades the whole page while a page-level VT slides up content, both run at once and fight for attention. Fix: use `default="none"` on the layout-level VT, or remove it entirely if pages manage their own animations. See "How Multiple ViewTransitions Interact" above.
 
@@ -740,7 +737,7 @@ Or disable specific animations conditionally in JavaScript events by checking th
 - When passing an object to `enter`/`exit`/`update`/`share`, TypeScript requires a `default` key in the object. This applies even if the component-level `default` prop is set. Always include `default: 'none'` (or `'auto'`) in type-keyed objects.
 
 **Orphaned CSS after removing ViewTransition:**
-- When removing `<ViewTransition>` components (e.g., switching animated collapse to `<details>`), remember to clean up corresponding `::view-transition-old(...)` / `::view-transition-new(...)` rules and `@keyframes` definitions. These don't cause build errors so they're easy to forget.
+- When removing `<ViewTransition>` components, remember to clean up corresponding `::view-transition-old(...)` / `::view-transition-new(...)` rules and `@keyframes` definitions. These don't cause build errors so they're easy to forget.
 
 **Batching:**
 - If multiple updates occur while an animation is running, React batches them into one. For example: if you navigate A→B, then B→C, then C→D during the first animation, the next animation will go B→D.
