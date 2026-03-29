@@ -365,6 +365,32 @@ Wrap children in `<ViewTransition update="none">` to prevent them from animating
 </ViewTransition>
 ```
 
+### Reusable Animated Collapse
+
+For apps with many expand/collapse interactions, extract a reusable wrapper instead of repeating the conditional-render-with-VT pattern:
+
+```jsx
+import { ViewTransition } from 'react';
+
+function AnimatedCollapse({ open, children }) {
+  if (!open) return null;
+  return (
+    <ViewTransition enter="expand-in" exit="collapse-out">
+      {children}
+    </ViewTransition>
+  );
+}
+```
+
+Use it with `startTransition` on the toggle — never with native `<details>`/`<summary>` (which bypasses React state):
+
+```jsx
+<button onClick={() => startTransition(() => setOpen(o => !o))}>Toggle</button>
+<AnimatedCollapse open={open}>
+  <SectionContent />
+</AnimatedCollapse>
+```
+
 ### Preserve State with Activity
 
 Use `<Activity>` with `<ViewTransition>` to animate show/hide while preserving component state:
@@ -420,6 +446,16 @@ Pick the level that carries the most meaning for your app:
 - **Mixed:** Use `default="none"` at the layout level and only activate it for specific `transitionTypes` (e.g., directional navigation). This way it stays silent during per-page Suspense transitions.
 
 The exception is **shared element transitions** — these intentionally span levels (one side unmounts while the other mounts) and don't conflict with other VTs because the `share` trigger takes precedence over `enter`/`exit`.
+
+### Multi-Level Coordination Checklist
+
+When combining directional layout VTs with per-page Suspense VTs, set `default="none"` at **every** level — not just the layout:
+
+1. **Layout VT** (`{children}`): `default="none"` — only fires for explicit `transitionTypes` (e.g., directional navigation)
+2. **Suspense fallback VTs** (skeleton → content): `default="none"` + explicit `exit` — they only need the exit animation (slide-down when content replaces skeleton). Without `default="none"`, the fallback VT would also cross-fade during route transitions triggered by `<Link>`
+3. **Content/item VTs** (per-item, expand/collapse): `default="none"` + explicit `enter`/`exit` — they only fire for their specific `startTransition` triggers
+
+This ensures each VT stays silent except for its intended trigger, even when `viewTransition: true` makes every `<Link>` navigation activate all mounted VTs.
 
 ---
 
@@ -646,11 +682,29 @@ Or disable specific animations conditionally in JavaScript events by checking th
 **Enter/exit not firing in a client component (only updates animate):**
 - `startTransition(() => setState(...))` triggers a Transition, but if the new content isn't behind a `<Suspense>` boundary, React treats the swap as an **update** to the existing tree — not an enter/exit. The `<ViewTransition>` sees its children change but never fully unmounts/remounts, so only `update` animations fire. To get true enter/exit, either conditionally render the `<ViewTransition>` itself (so it mounts/unmounts with the content), or wrap the async content in `<Suspense>` so React can treat the reveal as an insertion.
 
+**ViewTransition not firing on `<details>` toggle:**
+- Native `<details>`/`<summary>` elements are browser-controlled — their open/close state bypasses React entirely, so `startTransition` never wraps the toggle and `<ViewTransition>` never fires. Convert to controlled state with `useState` + `startTransition` + a `<button>` for animated expand/collapse (see the "Reusable Animated Collapse" pattern above).
+
 **Competing / double animations on navigation:**
 - Multiple `<ViewTransition>` components at different tree levels (layout + page + items) all fire simultaneously inside a single `document.startViewTransition`. If a layout-level VT cross-fades the whole page while a page-level VT slides up content, both run at once and fight for attention. Fix: use `default="none"` on the layout-level VT, or remove it entirely if pages manage their own animations. See "How Multiple ViewTransitions Interact" above.
 
 **Batching:**
 - If multiple updates occur while an animation is running, React batches them into one. For example: if you navigate A→B, then B→C, then C→D during the first animation, the next animation will go B→D.
+
+---
+
+## Animation Timing Guidelines
+
+Match duration to the interaction type — direct user actions need fast feedback, while ambient reveals can be slower:
+
+| Interaction | Duration | Rationale |
+|------------|----------|-----------|
+| Direct toggle (expand/collapse, show/hide) | 100–200ms | Responds to a click — must feel instant |
+| Route transition (directional slide) | 150–250ms | Brief spatial cue, shouldn't delay navigation |
+| Suspense reveal (skeleton → content) | 200–400ms | Soft reveal, content is "arriving" |
+| Shared element morph | 300–500ms | Users watch the morph — give it room to breathe |
+
+These are starting points. Test on low-end devices — animations that feel smooth on a fast machine can feel sluggish on mobile.
 
 ---
 
