@@ -425,15 +425,19 @@ Prevent unintended animations by disabling the default trigger on ViewTransition
   enter={{
     'navigation-forward': 'slide-in-from-right',
     'navigation-back': 'slide-in-from-left',
+    default: 'none',
   }}
   exit={{
     'navigation-forward': 'slide-out-to-left',
     'navigation-back': 'slide-out-to-right',
+    default: 'none',
   }}
 >
   {children}
 </ViewTransition>
 ```
+
+**TypeScript note:** When passing an object to `enter`/`exit`, the `ViewTransitionClassPerType` type requires a `default` key. Always include `default: 'none'` (or `'auto'`) in the object — omitting it causes a type error even if the component-level `default` prop is set.
 
 Without `default="none"`, a `<ViewTransition>` with `default="auto"` (the implicit default) fires the browser's cross-fade on **every** transition — including ones triggered by child Suspense boundaries, `useDeferredValue` updates, or `startTransition` calls within the page.
 

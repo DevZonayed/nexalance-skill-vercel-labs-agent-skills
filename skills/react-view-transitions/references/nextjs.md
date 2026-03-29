@@ -249,10 +249,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enter={{
             'navigation-forward': 'slide-in-from-right',
             'navigation-back': 'slide-in-from-left',
+            default: 'none',
           }}
           exit={{
             'navigation-forward': 'slide-out-to-left',
             'navigation-back': 'slide-out-to-right',
+            default: 'none',
           }}
         >
           {children}
