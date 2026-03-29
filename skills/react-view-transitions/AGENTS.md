@@ -337,7 +337,17 @@ Triggering the reorder inside `startTransition` will smoothly animate each item 
 
 ### Animate Suspense Fallback to Content
 
-The production pattern is to give the fallback an **exit-only** animation and the content an **enter-only** animation with `default="none"`. This is more intentional than a blanket crossfade and prevents the content VT from re-animating on every subsequent route navigation:
+Wrap `<Suspense>` in `<ViewTransition>` to cross-fade from fallback to loaded content:
+
+```jsx
+<ViewTransition>
+  <Suspense fallback={<Skeleton />}>
+    <AsyncContent />
+  </Suspense>
+</ViewTransition>
+```
+
+For directional motion, give the fallback and content separate VTs with explicit triggers. Use `default="none"` on the content VT to prevent it from re-animating on unrelated transitions:
 
 ```jsx
 <Suspense
@@ -351,18 +361,6 @@ The production pattern is to give the fallback an **exit-only** animation and th
     <AsyncContent />
   </ViewTransition>
 </Suspense>
-```
-
-The skeleton slides down when content replaces it (`exit`). The content slides up when it first appears (`enter`). `default="none"` on the content VT ensures it stays silent during unrelated transitions (e.g., link navigations that trigger the layout-level VT).
-
-For a simple crossfade without directional motion, wrap the whole `<Suspense>` instead:
-
-```jsx
-<ViewTransition>
-  <Suspense fallback={<Skeleton />}>
-    <AsyncContent />
-  </Suspense>
-</ViewTransition>
 ```
 
 ### Opt Out of Nested Animations
