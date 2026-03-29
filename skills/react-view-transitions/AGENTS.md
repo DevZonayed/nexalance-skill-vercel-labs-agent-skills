@@ -1,8 +1,31 @@
 # React View Transitions — Complete Reference
 
+
 React's View Transition API lets you animate between UI states using the browser's native `document.startViewTransition` under the hood. React manages the lifecycle automatically — you declare *what* to animate with `<ViewTransition>`, trigger *when* to animate through `startTransition` / `useDeferredValue` / `Suspense`, and control *how* to animate with CSS classes or JavaScript via the Web Animations API.
 
 The API adds ~3KB to your bundle, runs on the browser's compositor thread for 60fps animations, and gracefully falls back to instant state changes in unsupported browsers.
+
+## When to Animate (and When Not To)
+
+Every `<ViewTransition>` should answer: **what spatial relationship or continuity does this animation communicate to the user?** If you can't articulate it, don't add it.
+
+### Hierarchy of Animation Intent
+
+From highest value to lowest — start from the top and only move down if your app doesn't already have animations at that level:
+
+| Priority | Pattern | What it communicates | Example |
+|----------|---------|---------------------|---------|
+| 1 | **Shared element** (`name`) | "This is the same thing — I'm going deeper" | List thumbnail morphs into detail hero |
+| 2 | **Suspense reveal** | "Data loaded, here's the real content" | Skeleton cross-fades into loaded page |
+| 3 | **List identity** (per-item `key`) | "Same items, new arrangement" | Cards reorder during sort/filter |
+| 4 | **State change** (`enter`/`exit`) | "Something appeared or disappeared" | Panel slides in on toggle |
+| 5 | **Route change** (layout-level) | "Going to a new place" | Cross-fade between pages |
+
+Route-level transitions (#5) are the lowest priority because the URL change already signals a context switch. A blanket cross-fade on every navigation says nothing — it's visual noise. Prefer specific, intentional animations (#1–#4) over ambient page transitions.
+
+**Rule of thumb:** at any given moment, only one level of the tree should be visually transitioning. If your pages already manage their own Suspense reveals or shared element morphs, adding a layout-level route transition on top produces double-animation where both levels fight for attention.
+
+---
 
 ## Availability
 
@@ -354,6 +377,48 @@ import { Activity, ViewTransition, startTransition } from 'react';
 
 ---
 
+## How Multiple ViewTransitions Interact
+
+When a transition fires, **every** `<ViewTransition>` in the tree that matches the trigger participates simultaneously. Each gets its own `view-transition-name`, and the browser animates all of them inside a single `document.startViewTransition` call. They run in parallel, not sequentially.
+
+This means a layout-level VT (whole-page cross-fade) + a page-level VT (Suspense slide-up) + per-item VTs (list reorder) all fire at once. The result is usually competing animations that look broken.
+
+### Use `default="none"` Liberally
+
+Prevent unintended animations by disabling the default trigger on ViewTransitions that should only fire for specific types:
+
+```jsx
+// Only animates when 'navigation-forward' or 'navigation-back' types are present.
+// Silent on all other transitions (Suspense reveals, state changes, etc.)
+<ViewTransition
+  default="none"
+  enter={{
+    'navigation-forward': 'slide-in-from-right',
+    'navigation-back': 'slide-in-from-left',
+  }}
+  exit={{
+    'navigation-forward': 'slide-out-to-left',
+    'navigation-back': 'slide-out-to-right',
+  }}
+>
+  {children}
+</ViewTransition>
+```
+
+Without `default="none"`, a `<ViewTransition>` with `default="auto"` (the implicit default) fires the browser's cross-fade on **every** transition — including ones triggered by child Suspense boundaries, `useDeferredValue` updates, or `startTransition` calls within the page.
+
+### Choosing One Level
+
+Pick the level that carries the most meaning for your app:
+
+- **App with per-page Suspense reveals and shared elements:** Don't add a layout-level VT on `{children}`. The pages already manage their own transitions. A layout-level cross-fade on top will double-animate.
+- **Simple app with no per-page animations:** A layout-level VT with `default="auto"` on `{children}` gives you free cross-fades between routes.
+- **Mixed:** Use `default="none"` at the layout level and only activate it for specific `transitionTypes` (e.g., directional navigation). This way it stays silent during per-page Suspense transitions.
+
+The exception is **shared element transitions** — these intentionally span levels (one side unmounts while the other mounts) and don't conflict with other VTs because the `share` trigger takes precedence over `enter`/`exit`.
+
+---
+
 ## Next.js Integration
 
 Next.js supports React View Transitions. Enable it in `next.config.js` (or `next.config.ts`):
@@ -367,10 +432,18 @@ const nextConfig = {
 module.exports = nextConfig;
 ```
 
+**What this flag does:** It wraps every `<Link>` navigation in `document.startViewTransition`, which means all mounted `<ViewTransition>` components in the tree participate in every link navigation — not just ones triggered by `startTransition` or Suspense. This is important:
+
+- If you have a layout-level VT with `default: "auto"`, it fires on **every** `<Link>` navigation — even ones you didn't intend to animate.
+- Combined with per-page VTs (Suspense reveals, item animations), you get competing animations.
+- Without this flag, only `Suspense`-triggered and `startTransition`-triggered transitions fire.
+
+If your pages manage their own per-page transitions, either (a) don't use a layout-level `<ViewTransition>` on `{children}`, or (b) set `default="none"` on it so it only activates for explicit `transitionTypes`.
+
+For a detailed guide on Next.js integration, including App Router patterns and Server Component considerations, see the Next.js Integration section below.
+
 Key points:
 - The `<ViewTransition>` component is imported from `react` directly — no Next.js-specific import.
-- The `experimental.viewTransition` flag enables deeper integration with Next.js features beyond what `<ViewTransition>` provides on its own.
-- Wrap page content in `<ViewTransition>` inside the layout to animate route transitions.
 - Works with the App Router and `startTransition` + `router.push()` for programmatic navigation.
 
 ### The `transitionTypes` prop on `next/link`
@@ -393,7 +466,9 @@ import Link from 'next/link';
 
 The `transitionTypes` prop accepts an array of strings — the same types you would pass to `addTransitionType`. This removes the need for `'use client'`, `useRouter`, and custom link components when all you need is to tag a navigation with a transition type. The `<ViewTransition>` components in the tree respond to these types the same way they respond to manual `addTransitionType` calls.
 
-See the Next.js section below for full examples of `transitionTypes` with shared element transitions and directional animations across routes.
+**Composition note:** `transitionTypes` on `<Link>` works best when you have a single `<ViewTransition>` at the layout level with `default="none"` (so it only fires for your specific types) and no per-page Suspense VTs competing. If your pages have their own Suspense transitions, use `transitionTypes` at the page level (e.g., to distinguish sources of `startTransition` within a client component) rather than at the layout level, or the layout slide and the page's Suspense reveal will both fire simultaneously.
+
+For full examples of `transitionTypes` with shared element transitions and directional animations across routes, see the Next.js Integration section below.
 
 ---
 
@@ -528,7 +603,7 @@ These wrappers enforce that only valid transition IDs and animation classes are 
 
 ### Shared Elements Across Routes in Next.js
 
-See the Next.js Shared Elements Across Routes section below for complete examples using `transitionTypes` on `next/link` combined with shared element `<ViewTransition name={...}>` for list-to-detail image morph animations.
+See the Next.js Integration section below.
 
 ---
 
@@ -564,6 +639,9 @@ Or disable specific animations conditionally in JavaScript events by checking th
 **Animations from `flushSync` are skipped:**
 - `flushSync` completes synchronously, which prevents view transitions from running. Use `startTransition` instead.
 
+**Competing / double animations on navigation:**
+- Multiple `<ViewTransition>` components at different tree levels (layout + page + items) all fire simultaneously inside a single `document.startViewTransition`. If a layout-level VT cross-fades the whole page while a page-level VT slides up content, both run at once and fight for attention. Fix: use `default="none"` on the layout-level VT, or remove it entirely if pages manage their own animations. See "How Multiple ViewTransitions Interact" above.
+
 **Batching:**
 - If multiple updates occur while an animation is running, React batches them into one. For example: if you navigate A→B, then B→C, then C→D during the first animation, the next animation will go B→D.
 
@@ -571,12 +649,12 @@ Or disable specific animations conditionally in JavaScript events by checking th
 
 ## CSS Recipe Reference
 
-Ready-to-use CSS animation recipes follow below.
-
+For ready-to-use CSS animation recipes (slide, fade, scale, flip, and combined patterns), see the CSS Animation Recipes section below.
 
 ---
 
-# View Transitions in Next.js
+# Next.js Integration — Detailed Reference
+
 
 ## Table of Contents
 
@@ -606,7 +684,14 @@ const nextConfig = {
 module.exports = nextConfig;
 ```
 
-This flag enables deeper integration with Next.js features beyond what React's `<ViewTransition>` component provides on its own. The `<ViewTransition>` component itself is available from `react` in canary/experimental channels or React 19.2+.
+**What this flag does at runtime:** It wraps every `<Link>` navigation in `document.startViewTransition`. This means all mounted `<ViewTransition>` components in the tree participate in every link navigation — not just transitions triggered by `startTransition` or `Suspense`.
+
+Implications:
+- Any `<ViewTransition>` with `default="auto"` (the implicit default) fires the browser's cross-fade on **every** `<Link>` navigation.
+- Combined with per-page `<ViewTransition>` components (Suspense reveals, item animations), this produces competing animations.
+- Without this flag, only `Suspense`-triggered and `startTransition`-triggered transitions fire.
+
+The `<ViewTransition>` component itself is available from `react` in canary/experimental channels or React 19.2+.
 
 Install React canary if you're not yet on 19.2+:
 
@@ -640,6 +725,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 When users navigate between routes using `<Link>`, Next.js triggers a transition internally. The `<ViewTransition>` wrapping `{children}` detects the content swap and animates it with the default cross-fade.
 
+> **Warning:** This is an either/or choice with per-page animations. If your pages already have their own `<ViewTransition>` components (Suspense reveals, item reorder, shared elements), a layout-level VT on `{children}` produces double-animation — the layout cross-fades the entire old page while the new page's own entrance animations run simultaneously. Both levels get independent `view-transition-name`s, and the browser animates them in parallel, not sequentially.
+>
+> Use this pattern only in apps where pages have **no** per-page view transitions. Otherwise, either remove the layout-level VT or set `default="none"` on it.
+
 ---
 
 ## Layout-Level ViewTransition
@@ -663,6 +752,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 ```
 
 Only the `<main>` content animates when navigating between dashboard sub-routes. The sidebar stays static.
+
+> **Caution:** The same composition rule applies here — if the pages rendered inside `{children}` have their own `<ViewTransition>` components (Suspense boundaries, item animations), both levels will fire simultaneously. Use `default="none"` on the layout VT and only activate it for specific `transitionTypes` to avoid conflicts.
 
 ---
 
@@ -799,7 +890,7 @@ export function NavigateButton({
 }
 ```
 
-Configure `<ViewTransition>` to respond to these types:
+Configure `<ViewTransition>` to respond to these types. Use `default="none"` so the layout VT stays silent during per-page Suspense transitions and only fires for explicit navigation types:
 
 ```tsx
 // app/layout.tsx
@@ -810,15 +901,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <ViewTransition
+          default="none"
           enter={{
             'navigation-forward': 'slide-in-from-right',
             'navigation-back': 'slide-in-from-left',
-            default: 'auto',
           }}
           exit={{
             'navigation-forward': 'slide-out-to-left',
             'navigation-back': 'slide-out-to-right',
-            default: 'auto',
           }}
         >
           {children}
@@ -912,6 +1002,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 The skeleton cross-fades into the actual content once it loads.
 
+> **Important:** If you also have a layout-level `<ViewTransition>` wrapping `{children}` with `default="auto"`, it will fire simultaneously with this Suspense VT on every navigation, producing a double-animation. Either remove the layout-level VT, or set `default="none"` on it so it only responds to explicit `transitionTypes`.
+
 ---
 
 ## Server Components Considerations
@@ -923,10 +1015,10 @@ The skeleton cross-fades into the actual content once it loads.
 - Navigation via `<Link>` from `next/link` triggers transitions automatically when the experimental flag is enabled.
 - Prefer `transitionTypes` on `<Link>` over custom wrapper components. Only use manual `startTransition` + `addTransitionType` + `router.push()` for non-link interactions (buttons, form submissions, etc.).
 
-
 ---
 
-# CSS Animation Recipes for View Transitions
+# CSS Animation Recipes — Complete Collection
+
 
 Ready-to-use CSS snippets for common view transition animations. Use these class names with `<ViewTransition>` props.
 

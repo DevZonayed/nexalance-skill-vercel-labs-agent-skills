@@ -1,17 +1,6 @@
 ---
-name: vercel-react-view-transitions
-description:
-  Guide for implementing smooth, native-feeling animations using React's View
-  Transition API. Use when adding page transitions, animating route changes,
-  creating shared element animations, animating enter/exit of components,
-  list reorder, directional navigation animations, or integrating view
-  transitions in Next.js. Triggers on view transitions, ViewTransition,
-  addTransitionType, transition types, transitionTypes, or animating between
-  UI states in React without third-party animation libraries.
-license: MIT
-metadata:
-  author: vercel
-  version: '1.0.0'
+name: react-view-transition
+description: Guide for implementing smooth, native-feeling animations using React's View Transition API (`<ViewTransition>` component, `addTransitionType`, and CSS view transition pseudo-elements). Use this skill whenever the user wants to add page transitions, animate route changes, create shared element animations, animate enter/exit of components, animate list reorder, implement directional (forward/back) navigation animations, or integrate view transitions in Next.js. Also use when the user mentions view transitions, `startViewTransition`, `ViewTransition`, transition types, or asks about animating between UI states in React without third-party animation libraries.
 ---
 
 # React View Transitions
@@ -19,6 +8,28 @@ metadata:
 React's View Transition API lets you animate between UI states using the browser's native `document.startViewTransition` under the hood. React manages the lifecycle automatically — you declare *what* to animate with `<ViewTransition>`, trigger *when* to animate through `startTransition` / `useDeferredValue` / `Suspense`, and control *how* to animate with CSS classes or JavaScript via the Web Animations API.
 
 The API adds ~3KB to your bundle, runs on the browser's compositor thread for 60fps animations, and gracefully falls back to instant state changes in unsupported browsers.
+
+## When to Animate (and When Not To)
+
+Every `<ViewTransition>` should answer: **what spatial relationship or continuity does this animation communicate to the user?** If you can't articulate it, don't add it.
+
+### Hierarchy of Animation Intent
+
+From highest value to lowest — start from the top and only move down if your app doesn't already have animations at that level:
+
+| Priority | Pattern | What it communicates | Example |
+|----------|---------|---------------------|---------|
+| 1 | **Shared element** (`name`) | "This is the same thing — I'm going deeper" | List thumbnail morphs into detail hero |
+| 2 | **Suspense reveal** | "Data loaded, here's the real content" | Skeleton cross-fades into loaded page |
+| 3 | **List identity** (per-item `key`) | "Same items, new arrangement" | Cards reorder during sort/filter |
+| 4 | **State change** (`enter`/`exit`) | "Something appeared or disappeared" | Panel slides in on toggle |
+| 5 | **Route change** (layout-level) | "Going to a new place" | Cross-fade between pages |
+
+Route-level transitions (#5) are the lowest priority because the URL change already signals a context switch. A blanket cross-fade on every navigation says nothing — it's visual noise. Prefer specific, intentional animations (#1–#4) over ambient page transitions.
+
+**Rule of thumb:** at any given moment, only one level of the tree should be visually transitioning. If your pages already manage their own Suspense reveals or shared element morphs, adding a layout-level route transition on top produces double-animation where both levels fight for attention.
+
+---
 
 ## Availability
 
@@ -370,6 +381,48 @@ import { Activity, ViewTransition, startTransition } from 'react';
 
 ---
 
+## How Multiple ViewTransitions Interact
+
+When a transition fires, **every** `<ViewTransition>` in the tree that matches the trigger participates simultaneously. Each gets its own `view-transition-name`, and the browser animates all of them inside a single `document.startViewTransition` call. They run in parallel, not sequentially.
+
+This means a layout-level VT (whole-page cross-fade) + a page-level VT (Suspense slide-up) + per-item VTs (list reorder) all fire at once. The result is usually competing animations that look broken.
+
+### Use `default="none"` Liberally
+
+Prevent unintended animations by disabling the default trigger on ViewTransitions that should only fire for specific types:
+
+```jsx
+// Only animates when 'navigation-forward' or 'navigation-back' types are present.
+// Silent on all other transitions (Suspense reveals, state changes, etc.)
+<ViewTransition
+  default="none"
+  enter={{
+    'navigation-forward': 'slide-in-from-right',
+    'navigation-back': 'slide-in-from-left',
+  }}
+  exit={{
+    'navigation-forward': 'slide-out-to-left',
+    'navigation-back': 'slide-out-to-right',
+  }}
+>
+  {children}
+</ViewTransition>
+```
+
+Without `default="none"`, a `<ViewTransition>` with `default="auto"` (the implicit default) fires the browser's cross-fade on **every** transition — including ones triggered by child Suspense boundaries, `useDeferredValue` updates, or `startTransition` calls within the page.
+
+### Choosing One Level
+
+Pick the level that carries the most meaning for your app:
+
+- **App with per-page Suspense reveals and shared elements:** Don't add a layout-level VT on `{children}`. The pages already manage their own transitions. A layout-level cross-fade on top will double-animate.
+- **Simple app with no per-page animations:** A layout-level VT with `default="auto"` on `{children}` gives you free cross-fades between routes.
+- **Mixed:** Use `default="none"` at the layout level and only activate it for specific `transitionTypes` (e.g., directional navigation). This way it stays silent during per-page Suspense transitions.
+
+The exception is **shared element transitions** — these intentionally span levels (one side unmounts while the other mounts) and don't conflict with other VTs because the `share` trigger takes precedence over `enter`/`exit`.
+
+---
+
 ## Next.js Integration
 
 Next.js supports React View Transitions. Enable it in `next.config.js` (or `next.config.ts`):
@@ -383,12 +436,18 @@ const nextConfig = {
 module.exports = nextConfig;
 ```
 
+**What this flag does:** It wraps every `<Link>` navigation in `document.startViewTransition`, which means all mounted `<ViewTransition>` components in the tree participate in every link navigation — not just ones triggered by `startTransition` or Suspense. This is important:
+
+- If you have a layout-level VT with `default: "auto"`, it fires on **every** `<Link>` navigation — even ones you didn't intend to animate.
+- Combined with per-page VTs (Suspense reveals, item animations), you get competing animations.
+- Without this flag, only `Suspense`-triggered and `startTransition`-triggered transitions fire.
+
+If your pages manage their own per-page transitions, either (a) don't use a layout-level `<ViewTransition>` on `{children}`, or (b) set `default="none"` on it so it only activates for explicit `transitionTypes`.
+
 For a detailed guide on Next.js integration, including App Router patterns and Server Component considerations, read `references/nextjs.md`.
 
 Key points:
 - The `<ViewTransition>` component is imported from `react` directly — no Next.js-specific import.
-- The `experimental.viewTransition` flag enables deeper integration with Next.js features beyond what `<ViewTransition>` provides on its own.
-- Wrap page content in `<ViewTransition>` inside the layout to animate route transitions.
 - Works with the App Router and `startTransition` + `router.push()` for programmatic navigation.
 
 ### The `transitionTypes` prop on `next/link`
@@ -410,6 +469,8 @@ import Link from 'next/link';
 ```
 
 The `transitionTypes` prop accepts an array of strings — the same types you would pass to `addTransitionType`. This removes the need for `'use client'`, `useRouter`, and custom link components when all you need is to tag a navigation with a transition type. The `<ViewTransition>` components in the tree respond to these types the same way they respond to manual `addTransitionType` calls.
+
+**Composition note:** `transitionTypes` on `<Link>` works best when you have a single `<ViewTransition>` at the layout level with `default="none"` (so it only fires for your specific types) and no per-page Suspense VTs competing. If your pages have their own Suspense transitions, use `transitionTypes` at the page level (e.g., to distinguish sources of `startTransition` within a client component) rather than at the layout level, or the layout slide and the page's Suspense reveal will both fire simultaneously.
 
 For full examples of `transitionTypes` with shared element transitions and directional animations across routes, see `references/nextjs.md`.
 
@@ -581,6 +642,9 @@ Or disable specific animations conditionally in JavaScript events by checking th
 
 **Animations from `flushSync` are skipped:**
 - `flushSync` completes synchronously, which prevents view transitions from running. Use `startTransition` instead.
+
+**Competing / double animations on navigation:**
+- Multiple `<ViewTransition>` components at different tree levels (layout + page + items) all fire simultaneously inside a single `document.startViewTransition`. If a layout-level VT cross-fades the whole page while a page-level VT slides up content, both run at once and fight for attention. Fix: use `default="none"` on the layout-level VT, or remove it entirely if pages manage their own animations. See "How Multiple ViewTransitions Interact" above.
 
 **Batching:**
 - If multiple updates occur while an animation is running, React batches them into one. For example: if you navigate A→B, then B→C, then C→D during the first animation, the next animation will go B→D.

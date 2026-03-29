@@ -28,7 +28,14 @@ const nextConfig = {
 module.exports = nextConfig;
 ```
 
-This flag enables deeper integration with Next.js features beyond what React's `<ViewTransition>` component provides on its own. The `<ViewTransition>` component itself is available from `react` in canary/experimental channels or React 19.2+.
+**What this flag does at runtime:** It wraps every `<Link>` navigation in `document.startViewTransition`. This means all mounted `<ViewTransition>` components in the tree participate in every link navigation — not just transitions triggered by `startTransition` or `Suspense`.
+
+Implications:
+- Any `<ViewTransition>` with `default="auto"` (the implicit default) fires the browser's cross-fade on **every** `<Link>` navigation.
+- Combined with per-page `<ViewTransition>` components (Suspense reveals, item animations), this produces competing animations.
+- Without this flag, only `Suspense`-triggered and `startTransition`-triggered transitions fire.
+
+The `<ViewTransition>` component itself is available from `react` in canary/experimental channels or React 19.2+.
 
 Install React canary if you're not yet on 19.2+:
 
@@ -62,6 +69,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 When users navigate between routes using `<Link>`, Next.js triggers a transition internally. The `<ViewTransition>` wrapping `{children}` detects the content swap and animates it with the default cross-fade.
 
+> **Warning:** This is an either/or choice with per-page animations. If your pages already have their own `<ViewTransition>` components (Suspense reveals, item reorder, shared elements), a layout-level VT on `{children}` produces double-animation — the layout cross-fades the entire old page while the new page's own entrance animations run simultaneously. Both levels get independent `view-transition-name`s, and the browser animates them in parallel, not sequentially.
+>
+> Use this pattern only in apps where pages have **no** per-page view transitions. Otherwise, either remove the layout-level VT or set `default="none"` on it.
+
 ---
 
 ## Layout-Level ViewTransition
@@ -85,6 +96,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 ```
 
 Only the `<main>` content animates when navigating between dashboard sub-routes. The sidebar stays static.
+
+> **Caution:** The same composition rule applies here — if the pages rendered inside `{children}` have their own `<ViewTransition>` components (Suspense boundaries, item animations), both levels will fire simultaneously. Use `default="none"` on the layout VT and only activate it for specific `transitionTypes` to avoid conflicts.
 
 ---
 
@@ -221,7 +234,7 @@ export function NavigateButton({
 }
 ```
 
-Configure `<ViewTransition>` to respond to these types:
+Configure `<ViewTransition>` to respond to these types. Use `default="none"` so the layout VT stays silent during per-page Suspense transitions and only fires for explicit navigation types:
 
 ```tsx
 // app/layout.tsx
@@ -232,15 +245,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <ViewTransition
+          default="none"
           enter={{
             'navigation-forward': 'slide-in-from-right',
             'navigation-back': 'slide-in-from-left',
-            default: 'auto',
           }}
           exit={{
             'navigation-forward': 'slide-out-to-left',
             'navigation-back': 'slide-out-to-right',
-            default: 'auto',
           }}
         >
           {children}
@@ -333,6 +345,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 ```
 
 The skeleton cross-fades into the actual content once it loads.
+
+> **Important:** If you also have a layout-level `<ViewTransition>` wrapping `{children}` with `default="auto"`, it will fire simultaneously with this Suspense VT on every navigation, producing a double-animation. Either remove the layout-level VT, or set `default="none"` on it so it only responds to explicit `transitionTypes`.
 
 ---
 
