@@ -337,7 +337,25 @@ Triggering the reorder inside `startTransition` will smoothly animate each item 
 
 ### Animate Suspense Fallback to Content
 
-Wrap `<Suspense>` in `<ViewTransition>` to cross-fade from fallback to loaded content:
+The production pattern is to give the fallback an **exit-only** animation and the content an **enter-only** animation with `default="none"`. This is more intentional than a blanket crossfade and prevents the content VT from re-animating on every subsequent route navigation:
+
+```jsx
+<Suspense
+  fallback={
+    <ViewTransition exit="slide-down">
+      <Skeleton />
+    </ViewTransition>
+  }
+>
+  <ViewTransition default="none" enter="slide-up">
+    <AsyncContent />
+  </ViewTransition>
+</Suspense>
+```
+
+The skeleton slides down when content replaces it (`exit`). The content slides up when it first appears (`enter`). `default="none"` on the content VT ensures it stays silent during unrelated transitions (e.g., link navigations that trigger the layout-level VT).
+
+For a simple crossfade without directional motion, wrap the whole `<Suspense>` instead:
 
 ```jsx
 <ViewTransition>
@@ -360,6 +378,24 @@ Wrap children in `<ViewTransition update="none">` to prevent them from animating
   </div>
 </ViewTransition>
 ```
+
+### Isolate Floating Elements from Parent Animations
+
+Popovers, tooltips, and dropdowns can get captured in a parent's view transition snapshot, causing them to ghost or animate unexpectedly. Give them their own `viewTransitionName` to isolate them into a separate transition group:
+
+```jsx
+<SelectPopover style={{ viewTransitionName: 'popover' }}>
+  {options}
+</SelectPopover>
+```
+
+```css
+::view-transition-group(popover) {
+  z-index: 100;
+}
+```
+
+This creates an independent transition group that renders above other transitioning elements. The element won't be included in its parent's old/new snapshot.
 
 ### Reusable Animated Collapse
 
