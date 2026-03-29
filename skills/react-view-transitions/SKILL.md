@@ -27,6 +27,14 @@ From highest value to lowest — start from the top and only move down if your a
 
 Route-level transitions (#5) are the lowest priority because the URL change already signals a context switch. A blanket cross-fade on every navigation says nothing — it's visual noise. Prefer specific, intentional animations (#1–#4) over ambient page transitions.
 
+### Should This Element Use ViewTransition?
+
+- **Persistent across navigations?** (nav bar, sidebar, header) → Skip VT. Use plain `<Suspense>` if needed.
+- **Expand/collapse that needs to feel spatial?** → Animated collapse with VT + `startTransition`.
+- **Simple show/hide with no spatial meaning?** → `<details>` or conditional render, no VT.
+- **Already inside a parent VT?** → Check if `default="none"` is needed to avoid double-animation.
+- **Content that changes on route navigation?** → VT with `default="none"` + explicit triggers.
+
 **Rule of thumb:** at any given moment, only one level of the tree should be visually transitioning. If your pages already manage their own Suspense reveals or shared element morphs, adding a layout-level route transition on top produces double-animation where both levels fight for attention.
 
 ---
@@ -495,6 +503,12 @@ When combining directional layout VTs with per-page Suspense VTs, set `default="
 
 This ensures each VT stays silent except for its intended trigger, even when `viewTransition: true` makes every `<Link>` navigation activate all mounted VTs.
 
+Note: `default="none"` on content VTs is also critical when the content itself contains `<Link>` elements with `transitionTypes`. Without it, clicking a typed link inside the content would cause the content's own VT to re-animate (cross-fade) alongside the layout-level directional slide.
+
+### Persistent Layout Chrome
+
+Nav bars, headers, sidebars, and other layout elements that load once and don't change across navigations should generally **not** be wrapped in `<ViewTransition>`. Even if they're behind `<Suspense>` for initial data loading (auth checks, etc.), the one-time skeleton-to-content swap is barely perceptible. Wrapping them in VT causes them to re-animate on every `<Link>` navigation when `viewTransition: true` is enabled. Use plain `<Suspense fallback={<Skeleton />}>` without VT for these.
+
 ---
 
 ## Next.js Integration
@@ -552,18 +566,16 @@ For full examples of `transitionTypes` with shared element transitions and direc
 
 ## Real-World Patterns
 
-These patterns are drawn from production Next.js apps using View Transitions.
+### Searchable Grid with `useDeferredValue`
 
-### List-to-Detail with `useDeferredValue` and `ViewTransition`
-
-A common pattern is a client-side searchable grid where items expand into a detail view. Wrap each item in `<ViewTransition>` and use `useDeferredValue` to trigger animated updates as the user types:
+A client-side searchable grid where the filtered results cross-fade as the user types. `useDeferredValue` makes the filter update a transition, which activates the wrapping `<ViewTransition>`:
 
 ```tsx
 'use client';
 
 import { useDeferredValue, useState, ViewTransition, Suspense } from 'react';
 
-export default function TalksExplorer({ talksPromise }) {
+export default function SearchableGrid({ itemsPromise }) {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
 
@@ -572,19 +584,17 @@ export default function TalksExplorer({ talksPromise }) {
       <input
         value={search}
         onChange={(e) => setSearch(e.currentTarget.value)}
-        placeholder="Search talks..."
+        placeholder="Search..."
       />
       <ViewTransition>
         <Suspense fallback={<GridSkeleton />}>
-          <TalksGrid talksPromise={talksPromise} search={deferredSearch} />
+          <ItemGrid itemsPromise={itemsPromise} search={deferredSearch} />
         </Suspense>
       </ViewTransition>
     </>
   );
 }
 ```
-
-When `deferredSearch` updates (deferred from the search input), React treats it as a transition and the `<ViewTransition>` wrapping the `<Suspense>` boundary cross-fades between the old and new grid content.
 
 ### Card Expand/Collapse with `startTransition`
 
@@ -595,29 +605,29 @@ Toggle between a card grid and a detail view using `startTransition` to animate 
 
 import { useState, startTransition, ViewTransition } from 'react';
 
-export default function TalksGrid({ talks }) {
-  const [expandedTalkId, setExpandedTalkId] = useState(null);
+export default function ItemGrid({ items }) {
+  const [expandedId, setExpandedId] = useState(null);
 
-  return expandedTalkId ? (
+  return expandedId ? (
     <ViewTransition enter="slide-up" exit="slide-down">
-      <TalkDetails
-        talk={talks.find(t => t.id === expandedTalkId)}
-        closeAction={() => {
+      <ItemDetail
+        item={items.find(i => i.id === expandedId)}
+        onClose={() => {
           startTransition(() => {
-            setExpandedTalkId(null);
+            setExpandedId(null);
           });
         }}
       />
     </ViewTransition>
   ) : (
     <div className="grid grid-cols-3 gap-4">
-      {talks.map(talk => (
-        <ViewTransition key={talk.id}>
-          <TalkCard
-            talk={talk}
+      {items.map(item => (
+        <ViewTransition key={item.id}>
+          <ItemCard
+            item={item}
             onSelect={() => {
               startTransition(() => {
-                setExpandedTalkId(talk.id);
+                setExpandedId(item.id);
               });
             }}
           />
@@ -721,10 +731,16 @@ Or disable specific animations conditionally in JavaScript events by checking th
 - `startTransition(() => setState(...))` triggers a Transition, but if the new content isn't behind a `<Suspense>` boundary, React treats the swap as an **update** to the existing tree — not an enter/exit. The `<ViewTransition>` sees its children change but never fully unmounts/remounts, so only `update` animations fire. To get true enter/exit, either conditionally render the `<ViewTransition>` itself (so it mounts/unmounts with the content), or wrap the async content in `<Suspense>` so React can treat the reveal as an insertion.
 
 **ViewTransition not firing on `<details>` toggle:**
-- Native `<details>`/`<summary>` elements are browser-controlled — their open/close state bypasses React entirely, so `startTransition` never wraps the toggle and `<ViewTransition>` never fires. Convert to controlled state with `useState` + `startTransition` + a `<button>` for animated expand/collapse (see the "Reusable Animated Collapse" pattern above).
+- Native `<details>`/`<summary>` is browser-controlled — open/close bypasses React, so `startTransition` never wraps the toggle and `<ViewTransition>` never fires. This is a trade-off: `<details>` is simpler and more accessible out of the box, but can't be animated with VT. If you need animated expand/collapse, use controlled state with `useState` + `startTransition`. If you don't need the animation, `<details>` is the simpler choice.
 
 **Competing / double animations on navigation:**
 - Multiple `<ViewTransition>` components at different tree levels (layout + page + items) all fire simultaneously inside a single `document.startViewTransition`. If a layout-level VT cross-fades the whole page while a page-level VT slides up content, both run at once and fight for attention. Fix: use `default="none"` on the layout-level VT, or remove it entirely if pages manage their own animations. See "How Multiple ViewTransitions Interact" above.
+
+**TypeScript error: "Property 'default' is missing in type 'ViewTransitionClassPerType'":**
+- When passing an object to `enter`/`exit`/`update`/`share`, TypeScript requires a `default` key in the object. This applies even if the component-level `default` prop is set. Always include `default: 'none'` (or `'auto'`) in type-keyed objects.
+
+**Orphaned CSS after removing ViewTransition:**
+- When removing `<ViewTransition>` components (e.g., switching animated collapse to `<details>`), remember to clean up corresponding `::view-transition-old(...)` / `::view-transition-new(...)` rules and `@keyframes` definitions. These don't cause build errors so they're easy to forget.
 
 **Batching:**
 - If multiple updates occur while an animation is running, React batches them into one. For example: if you navigate A→B, then B→C, then C→D during the first animation, the next animation will go B→D.
