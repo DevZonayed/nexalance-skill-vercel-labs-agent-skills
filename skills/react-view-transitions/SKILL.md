@@ -27,14 +27,6 @@ From highest value to lowest — start from the top and only move down if your a
 
 Route-level transitions (#5) are the lowest priority because the URL change already signals a context switch. A blanket cross-fade on every navigation says nothing — it's visual noise. Prefer specific, intentional animations (#1–#4) over ambient page transitions.
 
-### Should This Element Use ViewTransition?
-
-- **Persistent across navigations?** (nav bar, sidebar, header) → Skip VT. Use plain `<Suspense>` if needed.
-- **Expand/collapse that needs to feel spatial?** → Animated collapse with VT + `startTransition`.
-- **Simple show/hide with no spatial meaning?** → Conditional render, no VT.
-- **Already inside a parent VT?** → Check if `default="none"` is needed to avoid double-animation.
-- **Content that changes on route navigation?** → VT with `default="none"` + explicit triggers.
-
 **Rule of thumb:** at any given moment, only one level of the tree should be visually transitioning. If your pages already manage their own Suspense reveals or shared element morphs, adding a layout-level route transition on top produces double-animation where both levels fight for attention.
 
 ---
@@ -493,21 +485,6 @@ Pick the level that carries the most meaning for your app:
 
 The exception is **shared element transitions** — these intentionally span levels (one side unmounts while the other mounts) and don't conflict with other VTs because the `share` trigger takes precedence over `enter`/`exit`.
 
-### Multi-Level Coordination Checklist
-
-When combining directional layout VTs with per-page Suspense VTs, set `default="none"` at **every** level — not just the layout:
-
-1. **Layout VT** (`{children}`): `default="none"` — only fires for explicit `transitionTypes` (e.g., directional navigation)
-2. **Suspense fallback VTs** (skeleton → content): `default="none"` + explicit `exit` — they only need the exit animation (slide-down when content replaces skeleton). Without `default="none"`, the fallback VT would also cross-fade during route transitions triggered by `<Link>`
-3. **Content/item VTs** (per-item, expand/collapse): `default="none"` + explicit `enter`/`exit` — they only fire for their specific `startTransition` triggers
-
-This ensures each VT stays silent except for its intended trigger, even when `viewTransition: true` makes every `<Link>` navigation activate all mounted VTs.
-
-Note: `default="none"` on content VTs is also critical when the content itself contains `<Link>` elements with `transitionTypes`. Without it, clicking a typed link inside the content would cause the content's own VT to re-animate (cross-fade) alongside the layout-level directional slide.
-
-### Persistent Layout Chrome
-
-Nav bars, headers, sidebars, and other layout elements that load once and don't change across navigations should generally **not** be wrapped in `<ViewTransition>`. Even if they're behind `<Suspense>` for initial data loading (auth checks, etc.), the one-time skeleton-to-content swap is barely perceptible. Wrapping them in VT causes them to re-animate on every `<Link>` navigation when `viewTransition: true` is enabled. Use plain `<Suspense fallback={<Skeleton />}>` without VT for these.
 
 ---
 
@@ -735,9 +712,6 @@ Or disable specific animations conditionally in JavaScript events by checking th
 
 **TypeScript error: "Property 'default' is missing in type 'ViewTransitionClassPerType'":**
 - When passing an object to `enter`/`exit`/`update`/`share`, TypeScript requires a `default` key in the object. This applies even if the component-level `default` prop is set. Always include `default: 'none'` (or `'auto'`) in type-keyed objects.
-
-**Orphaned CSS after removing ViewTransition:**
-- When removing `<ViewTransition>` components, remember to clean up corresponding `::view-transition-old(...)` / `::view-transition-new(...)` rules and `@keyframes` definitions. These don't cause build errors so they're easy to forget.
 
 **Batching:**
 - If multiple updates occur while an animation is running, React batches them into one. For example: if you navigate A→B, then B→C, then C→D during the first animation, the next animation will go B→D.
