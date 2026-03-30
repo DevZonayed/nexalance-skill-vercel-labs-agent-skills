@@ -3,14 +3,13 @@
 ## Table of Contents
 
 1. [Setup](#setup)
-2. [Basic Route Transitions](#basic-route-transitions)
-3. [Layout-Level ViewTransition](#layout-level-viewtransition)
-4. [The transitionTypes Prop on next/link](#the-transitiontypes-prop-on-nextlink)
-5. [Programmatic Navigation with Transitions](#programmatic-navigation-with-transitions)
-6. [Transition Types for Navigation Direction](#transition-types-for-navigation-direction)
-7. [Shared Elements Across Routes](#shared-elements-across-routes)
-8. [Combining with Suspense and Loading States](#combining-with-suspense-and-loading-states)
-9. [Server Components Considerations](#server-components-considerations)
+2. [Layout-Level ViewTransition](#layout-level-viewtransition)
+3. [The transitionTypes Prop on next/link](#the-transitiontypes-prop-on-nextlink)
+4. [Programmatic Navigation with Transitions](#programmatic-navigation-with-transitions)
+5. [Transition Types for Navigation Direction](#transition-types-for-navigation-direction)
+6. [Shared Elements Across Routes](#shared-elements-across-routes)
+7. [Combining with Suspense and Loading States](#combining-with-suspense-and-loading-states)
+8. [Server Components Considerations](#server-components-considerations)
 
 ---
 
@@ -73,10 +72,12 @@ This works for simple apps where pages have **no** `<ViewTransition>` components
 
 **But the moment any page adds its own `<ViewTransition>` (a Suspense slide-up, an item reorder, a shared element), remove the layout-level one or set `default="none"` on it.** Otherwise both levels animate in parallel, not sequentially.
 
-For apps that need layout-level control, use `default="none"` and only activate for specific `transitionTypes`:
+**Layouts persist across navigations — they never unmount/remount.** `enter`/`exit` props on a `<ViewTransition>` inside a layout only fire when the layout itself first mounts, not on subsequent route changes. Do not use type-keyed `enter`/`exit` maps in a layout for directional navigation — they won't fire.
+
+If you need the layout to stay silent while pages manage their own animations, use `default="none"`:
 
 ```tsx
-// app/dashboard/layout.tsx
+// app/dashboard/layout.tsx — prevents layout from interfering with per-page VTs
 import { ViewTransition } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -84,19 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="dashboard">
       <Sidebar />
       <main>
-        <ViewTransition
-          default="none"
-          enter={{
-            'nav-forward': 'nav-forward',
-            'nav-back': 'nav-back',
-            default: 'none',
-          }}
-          exit={{
-            'nav-forward': 'nav-forward',
-            'nav-back': 'nav-back',
-            default: 'none',
-          }}
-        >
+        <ViewTransition default="none">
           {children}
         </ViewTransition>
       </main>
@@ -105,9 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 }
 ```
 
-Only the content area animates, only when explicit navigation types are present, and the sidebar stays static.
-
-**Even with `default="none"`, a layout-level directional slide will fire simultaneously with any per-page Suspense `<ViewTransition>`s.** If a page has `<ViewTransition enter="slide-up">` on a Suspense boundary, and the layout slides in from the right, both run at once — producing a diagonal movement. If your pages use Suspense reveals with `<ViewTransition>`, directional layout transitions usually hurt more than they help — the Suspense slide-up/slide-down already communicates "new content loading."
+This ensures the layout doesn't fire the default cross-fade on every navigation, while still allowing per-page `<ViewTransition>` components to work independently.
 
 ---
 
@@ -192,7 +179,7 @@ Wrapping `router.push()` in `startTransition` is what activates the `<ViewTransi
 
 ## Transition Types for Navigation Direction
 
-A common pattern is to animate differently for forward vs. backward navigation.
+Directional transitions animate forward/backward navigation with horizontal slides. They can coexist with Suspense reveals on the same page when properly isolated — see the two-layer pattern below.
 
 ### Using `transitionTypes` on `next/link` (preferred)
 
@@ -244,9 +231,63 @@ export function NavigateButton({
 }
 ```
 
-Configure `<ViewTransition>` in the layout to respond to these types. See the Layout-Level ViewTransition section above for the `default="none"` pattern with type-keyed `enter`/`exit` maps.
+Place a `<ViewTransition>` with type-keyed `enter`/`exit` on each **page** (not in a layout — layouts persist and don't trigger enter/exit on navigation):
 
-**When to skip directional nav transitions:** If your pages already use Suspense reveals with `<ViewTransition>` (priority #2 in the Hierarchy of Animation Intent), adding route-level directional transitions (priority #5) usually hurts more than it helps. The Suspense slide-up/slide-down already communicates "new content loading" — adding a horizontal slide on top produces a diagonal movement where both animations fight for attention. Prefer shared element transitions (#1) or just let Suspense handle it.
+```tsx
+// In each page component — NOT in layout.tsx
+<ViewTransition
+  default="none"
+  enter={{
+    'transition-forwards': 'slide-in-from-right',
+    'transition-backwards': 'slide-in-from-left',
+    default: 'none',
+  }}
+  exit={{
+    'transition-forwards': 'slide-out-to-left',
+    'transition-backwards': 'slide-out-to-right',
+    default: 'none',
+  }}
+>
+  <PageContent />
+</ViewTransition>
+```
+
+### Two-Layer Pattern: Directional Nav + Suspense Reveals
+
+Directional nav slides and Suspense content reveals can coexist on the same page because they fire at **different moments**: the nav slide fires during navigation (when the `transitionTypes` type is present), and the Suspense reveal fires later when streamed data loads (a separate transition with no type). `default="none"` on both layers prevents cross-interference:
+
+```tsx
+export default function DetailPage() {
+  return (
+    <ViewTransition
+      enter={{ "nav-forward": "slide-from-right", default: "none" }}
+      exit={{ "nav-forward": "slide-to-left", default: "none" }}
+      default="none"
+    >
+      <div>
+        <Suspense fallback={
+          <ViewTransition exit="slide-down"><HeaderSkeleton /></ViewTransition>
+        }>
+          <ViewTransition enter="slide-up" default="none">
+            <Header />
+          </ViewTransition>
+        </Suspense>
+        <Suspense fallback={
+          <ViewTransition exit="slide-down"><ContentSkeleton /></ViewTransition>
+        }>
+          <ViewTransition enter="slide-up" default="none">
+            <Content />
+          </ViewTransition>
+        </Suspense>
+      </div>
+    </ViewTransition>
+  );
+}
+```
+
+The outer `<ViewTransition>` only fires when `nav-forward` is present — it stays silent during Suspense resolves (no type, `default: "none"`). The inner `<ViewTransition>`s use simple string props — they fire on Suspense resolve regardless of type.
+
+Place the outer wrapper in each **page component**, not in `layout.tsx` (layouts persist, enter/exit won't fire).
 
 ---
 
@@ -327,7 +368,9 @@ Next.js `loading.tsx` files create `<Suspense>` boundaries. Wrap them with `<Vie
 
 The skeleton slides out, then the content slides in. `default="none"` on the content prevents it from re-animating on unrelated transitions.
 
-**Do not combine this with a layout-level `<ViewTransition>` that has `default="auto"`.** Both will fire simultaneously — the layout cross-fades the whole page while the Suspense boundary slides up content, producing a broken double-animation. If you need both, set `default="none"` on the layout-level one and only activate it for specific `transitionTypes`.
+**Do not combine this with a layout-level `<ViewTransition>` that has `default="auto"`.** Both fire during the same transition — the layout cross-fades while the Suspense boundary slides up, producing competing animations. Use `default="none"` on layout-level `<ViewTransition>`s, or remove them entirely.
+
+Directional navigation transitions (via `transitionTypes`) can coexist with Suspense reveals when placed as an outer wrapper in the page component with `default="none"` and type-keyed enter/exit — they fire at different moments (see "Two-Layer Pattern" in Transition Types for Navigation Direction).
 
 ---
 

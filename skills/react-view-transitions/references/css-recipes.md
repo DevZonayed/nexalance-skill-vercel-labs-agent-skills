@@ -107,7 +107,52 @@ Usage:
 
 ## Directional Navigation
 
-A single CSS class name targets both `::view-transition-old` and `::view-transition-new` with different animations. This keeps the JSX simple — `enter="nav-forward"` / `exit="nav-forward"`:
+### Separate Enter/Exit Classes
+
+Used with the two-layer pattern where `enter` and `exit` map to different class names:
+
+```css
+::view-transition-new(.slide-from-right) {
+  --slide-offset: 60px;
+  animation:
+    var(--duration-enter) ease-out var(--duration-exit) both fade,
+    var(--duration-move) ease-in-out both slide;
+}
+::view-transition-old(.slide-to-left) {
+  --slide-offset: -60px;
+  animation:
+    var(--duration-exit) ease-in both fade reverse,
+    var(--duration-move) ease-in-out both slide reverse;
+}
+
+::view-transition-new(.slide-from-left) {
+  --slide-offset: -60px;
+  animation:
+    var(--duration-enter) ease-out var(--duration-exit) both fade,
+    var(--duration-move) ease-in-out both slide;
+}
+::view-transition-old(.slide-to-right) {
+  --slide-offset: 60px;
+  animation:
+    var(--duration-exit) ease-in both fade reverse,
+    var(--duration-move) ease-in-out both slide reverse;
+}
+```
+
+Usage with the two-layer pattern:
+```jsx
+<ViewTransition
+  enter={{ "nav-forward": "slide-from-right", default: "none" }}
+  exit={{ "nav-forward": "slide-to-left", default: "none" }}
+  default="none"
+>
+  {children}
+</ViewTransition>
+```
+
+### Single-Class Approach
+
+Alternatively, a single CSS class name targets both `::view-transition-old` and `::view-transition-new` with different animations. This keeps the JSX simple — `enter="nav-forward"` / `exit="nav-forward"`:
 
 ```css
 ::view-transition-old(.nav-forward) {
@@ -224,6 +269,19 @@ Usage:
 Usage:
 ```jsx
 <ViewTransition enter="scale-in" exit="scale-out" />
+```
+
+---
+
+## Persistent Element Isolation
+
+Prevent sticky headers, navbars, and sidebars from being captured in page content's transition snapshot. Give them a `viewTransitionName` in JSX, then disable animation on their group:
+
+```css
+::view-transition-group(dashboard-header) {
+  animation: none;
+  z-index: 100;
+}
 ```
 
 ---
