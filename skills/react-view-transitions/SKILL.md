@@ -37,8 +37,8 @@ Route-level transitions (#5) are the lowest priority because the URL change alre
 
 ## Availability
 
-- `<ViewTransition>` and `addTransitionType` shipped in **React 19.2** (stable).
-- For older React 19 versions, both are available in `react@canary` and `react@experimental`.
+- `<ViewTransition>` and `addTransitionType` are currently available in `react@canary` and `react@experimental` only — they are **not yet in a stable release**.
+- Install with `npm install react@canary react-dom@canary` (or `@experimental`).
 - Browser support: Chromium-based browsers have full support. Firefox and Safari are adding support. The API gracefully degrades — unsupported browsers skip the animation and apply the DOM change instantly.
 
 ---

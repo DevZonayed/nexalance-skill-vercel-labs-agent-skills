@@ -28,8 +28,8 @@ Route-level transitions (#5) are the lowest priority because the URL change alre
 
 ## Availability
 
-- `<ViewTransition>` and `addTransitionType` shipped in **React 19.2** (stable).
-- For older React 19 versions, both are available in `react@canary` and `react@experimental`.
+- `<ViewTransition>` and `addTransitionType` are currently available in `react@canary` and `react@experimental` only — they are **not yet in a stable release**.
+- Install with `npm install react@canary react-dom@canary` (or `@experimental`).
 - Browser support: Chromium-based browsers have full support. Firefox and Safari are adding support. The API gracefully degrades — unsupported browsers skip the animation and apply the DOM change instantly.
 
 ---
@@ -1082,9 +1082,7 @@ Implications:
 - Combined with per-page `<ViewTransition>` components (Suspense reveals, item animations), this produces competing animations.
 - Without this flag, only `Suspense`-triggered and `startTransition`-triggered transitions fire.
 
-The `<ViewTransition>` component itself is available from `react` in canary/experimental channels or React 19.2+.
-
-Install React canary if you're not yet on 19.2+:
+The `<ViewTransition>` component is currently available in `react@canary` and `react@experimental` only:
 
 ```bash
 npm install react@canary react-dom@canary

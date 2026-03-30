@@ -35,9 +35,7 @@ Implications:
 - Combined with per-page `<ViewTransition>` components (Suspense reveals, item animations), this produces competing animations.
 - Without this flag, only `Suspense`-triggered and `startTransition`-triggered transitions fire.
 
-The `<ViewTransition>` component itself is available from `react` in canary/experimental channels or React 19.2+.
-
-Install React canary if you're not yet on 19.2+:
+The `<ViewTransition>` component is currently available in `react@canary` and `react@experimental` only:
 
 ```bash
 npm install react@canary react-dom@canary
