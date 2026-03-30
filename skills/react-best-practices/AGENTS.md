@@ -21,11 +21,12 @@ Comprehensive performance optimization guide for React and Next.js applications,
 ## Table of Contents
 
 1. [Eliminating Waterfalls](#1-eliminating-waterfalls) — **CRITICAL**
-   - 1.1 [Defer Await Until Needed](#11-defer-await-until-needed)
-   - 1.2 [Dependency-Based Parallelization](#12-dependency-based-parallelization)
-   - 1.3 [Prevent Waterfall Chains in API Routes](#13-prevent-waterfall-chains-in-api-routes)
-   - 1.4 [Promise.all() for Independent Operations](#14-promiseall-for-independent-operations)
-   - 1.5 [Strategic Suspense Boundaries](#15-strategic-suspense-boundaries)
+   - 1.1 [Check Cheap Conditions Before Async Flags](#11-check-cheap-conditions-before-async-flags)
+   - 1.2 [Defer Await Until Needed](#12-defer-await-until-needed)
+   - 1.3 [Dependency-Based Parallelization](#13-dependency-based-parallelization)
+   - 1.4 [Prevent Waterfall Chains in API Routes](#14-prevent-waterfall-chains-in-api-routes)
+   - 1.5 [Promise.all() for Independent Operations](#15-promiseall-for-independent-operations)
+   - 1.6 [Strategic Suspense Boundaries](#16-strategic-suspense-boundaries)
 2. [Bundle Size Optimization](#2-bundle-size-optimization) — **CRITICAL**
    - 2.1 [Avoid Barrel File Imports](#21-avoid-barrel-file-imports)
    - 2.2 [Conditional Module Loading](#22-conditional-module-loading)
@@ -103,7 +104,40 @@ Comprehensive performance optimization guide for React and Next.js applications,
 
 Waterfalls are the #1 performance killer. Each sequential await adds full network latency. Eliminating them yields the largest gains.
 
-### 1.1 Defer Await Until Needed
+### 1.1 Check Cheap Conditions Before Async Flags
+
+**Impact: HIGH (avoids unnecessary async work when a synchronous guard already fails)**
+
+When a branch uses `await` for a flag or remote value and also requires a **cheap synchronous** condition (local props, request metadata, already-loaded state), evaluate the cheap condition **first**. Otherwise you pay for the async call even when the compound condition can never be true.
+
+This is a specialization of [Defer Await Until Needed](./async-defer-await.md) for `flag && cheapCondition` style checks.
+
+**Incorrect:**
+
+```typescript
+const someFlag = await getFlag()
+
+if (someFlag && someCondition) {
+  // ...
+}
+```
+
+**Correct:**
+
+```typescript
+if (someCondition) {
+  const someFlag = await getFlag()
+  if (someFlag) {
+    // ...
+  }
+}
+```
+
+This matters when `getFlag` hits the network, a feature-flag service, or `React.cache` / DB work: skipping it when `someCondition` is false removes that cost on the cold path.
+
+Keep the original order if `someCondition` is expensive, depends on the flag, or you must run side effects in a fixed order.
+
+### 1.2 Defer Await Until Needed
 
 **Impact: HIGH (avoids blocking unused code paths)**
 
@@ -179,7 +213,9 @@ async function updateResource(resourceId: string, userId: string) {
 
 This optimization is especially valuable when the skipped branch is frequently taken, or when the deferred operation is expensive.
 
-### 1.2 Dependency-Based Parallelization
+For `await getFlag()` combined with a cheap synchronous guard (`flag && someCondition`), see [Check Cheap Conditions Before Async Flags](./async-cheap-condition-before-await.md).
+
+### 1.3 Dependency-Based Parallelization
 
 **Impact: CRITICAL (2-10× improvement)**
 
@@ -226,7 +262,7 @@ We can also create all the promises first, and do `Promise.all()` at the end.
 
 Reference: [https://github.com/shuding/better-all](https://github.com/shuding/better-all)
 
-### 1.3 Prevent Waterfall Chains in API Routes
+### 1.4 Prevent Waterfall Chains in API Routes
 
 **Impact: CRITICAL (2-10× improvement)**
 
@@ -260,7 +296,7 @@ export async function GET(request: Request) {
 
 For operations with more complex dependency chains, use `better-all` to automatically maximize parallelism (see Dependency-Based Parallelization).
 
-### 1.4 Promise.all() for Independent Operations
+### 1.5 Promise.all() for Independent Operations
 
 **Impact: CRITICAL (2-10× improvement)**
 
@@ -284,7 +320,7 @@ const [user, posts, comments] = await Promise.all([
 ])
 ```
 
-### 1.5 Strategic Suspense Boundaries
+### 1.6 Strategic Suspense Boundaries
 
 **Impact: HIGH (faster initial paint)**
 

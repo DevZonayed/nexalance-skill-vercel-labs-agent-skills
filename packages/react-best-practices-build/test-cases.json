@@ -65,6 +65,22 @@
   },
   {
     "ruleId": "",
+    "ruleTitle": "Check Cheap Conditions Before Async Flags",
+    "type": "bad",
+    "code": "const someFlag = await getFlag()\n\nif (someFlag && someCondition) {\n  // ...\n}",
+    "language": "typescript",
+    "description": "Incorrect example for Check Cheap Conditions Before Async Flags"
+  },
+  {
+    "ruleId": "",
+    "ruleTitle": "Check Cheap Conditions Before Async Flags",
+    "type": "good",
+    "code": "if (someCondition) {\n  const someFlag = await getFlag()\n  if (someFlag) {\n    // ...\n  }\n}",
+    "language": "typescript",
+    "description": "Correct example for Check Cheap Conditions Before Async Flags"
+  },
+  {
+    "ruleId": "",
     "ruleTitle": "Defer Await Until Needed",
     "type": "bad",
     "code": "async function handleRequest(userId: string, skipProcessing: boolean) {\n  const userData = await fetchUserData(userId)\n  \n  if (skipProcessing) {\n    // Returns immediately but still waited for userData\n    return { skipped: true }\n  }\n  \n  // Only this branch uses userData\n  return processUserData(userData)\n}",
