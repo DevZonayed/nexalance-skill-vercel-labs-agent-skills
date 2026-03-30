@@ -50,7 +50,7 @@ When in doubt, use a bare `<ViewTransition>` (default cross-fade) or `default="n
 
 ## Availability
 
-- `<ViewTransition>` and `addTransitionType` require `react@canary` or `react@experimental`. Check `react --version` — if these APIs are not available, install canary: `npm install react@canary react-dom@canary`.
+- `<ViewTransition>` and `addTransitionType` require `react@canary` or `react@experimental`. They are **not** in stable React (including 19.x). Before implementing, verify the project uses canary — check `package.json` for `"react": "canary"` or run `npm ls react`. If on stable, install canary: `npm install react@canary react-dom@canary`.
 - Browser support: Chromium 111+, with Firefox and Safari adding support. The API gracefully degrades — unsupported browsers skip the animation and apply the DOM change instantly.
 
 ---
