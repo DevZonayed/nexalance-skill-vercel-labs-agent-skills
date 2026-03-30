@@ -32,23 +32,25 @@ export default function SearchableGrid({ itemsPromise }) {
 
 ## Card Expand/Collapse with `startTransition`
 
-Toggle between a card grid and a detail view using `startTransition` to animate the swap:
+Toggle between a card grid and a detail view using `startTransition` to animate the swap. Add a shared element `name` to morph the card into the detail view:
 
 ```tsx
 'use client';
 
-import { useState, startTransition, ViewTransition } from 'react';
+import { useState, useRef, startTransition, ViewTransition } from 'react';
 
 export default function ItemGrid({ items }) {
   const [expandedId, setExpandedId] = useState(null);
+  const scrollRef = useRef(0);
 
   return expandedId ? (
-    <ViewTransition enter="slide-up" exit="slide-down">
+    <ViewTransition enter="slide-in" name={`item-${expandedId}`}>
       <ItemDetail
         item={items.find(i => i.id === expandedId)}
         onClose={() => {
           startTransition(() => {
             setExpandedId(null);
+            setTimeout(() => window.scrollTo({ behavior: 'smooth', top: scrollRef.current }), 100);
           });
         }}
       />
@@ -56,13 +58,12 @@ export default function ItemGrid({ items }) {
   ) : (
     <div className="grid grid-cols-3 gap-4">
       {items.map(item => (
-        <ViewTransition key={item.id}>
+        <ViewTransition key={item.id} name={`item-${item.id}`}>
           <ItemCard
             item={item}
             onSelect={() => {
-              startTransition(() => {
-                setExpandedId(item.id);
-              });
+              scrollRef.current = window.scrollY;
+              startTransition(() => setExpandedId(item.id));
             }}
           />
         </ViewTransition>
@@ -72,31 +73,7 @@ export default function ItemGrid({ items }) {
 }
 ```
 
-The CSS for slide-up/slide-down enter/exit:
-
-```css
-::view-transition-old(.slide-down) {
-  animation: 150ms ease-out both fade-out, 150ms ease-out both slide-down;
-}
-::view-transition-new(.slide-up) {
-  animation: 210ms ease-in 150ms both fade-in, 400ms ease-in both slide-up;
-}
-
-@keyframes slide-up {
-  from { transform: translateY(10px); }
-  to { transform: translateY(0); }
-}
-@keyframes slide-down {
-  from { transform: translateY(0); }
-  to { transform: translateY(10px); }
-}
-@keyframes fade-in {
-  from { opacity: 0; }
-}
-@keyframes fade-out {
-  to { opacity: 0; }
-}
-```
+The shared `name={`item-${id}`}` on both the card and detail `<ViewTransition>` creates a shared element pair — the card morphs into the detail view. The `scrollRef` saves and restores scroll position so users return to where they were in the grid. See `css-recipes.md` for the slide-up/slide-down CSS.
 
 ## Type-Safe Transition Helpers
 
@@ -144,6 +121,14 @@ Popovers, tooltips, and dropdowns can get captured in a parent's view transition
 ```
 
 This creates an independent transition group that renders above other transitioning elements. The element won't be included in its parent's old/new snapshot.
+
+For a global fix that ensures all view transition groups render above normal content, use the wildcard selector:
+
+```css
+::view-transition-group(*) {
+  z-index: 100;
+}
+```
 
 ## Reusable Animated Collapse
 

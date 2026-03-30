@@ -16,7 +16,9 @@
 
 ## Setup
 
-Enable the experimental flag in `next.config.js` (or `next.config.ts`):
+`<ViewTransition>` works in Next.js out of the box for `startTransition`- and `Suspense`-triggered updates — no config flag is needed for those.
+
+To also animate `<Link>` navigations, enable the experimental flag in `next.config.js` (or `next.config.ts`):
 
 ```js
 /** @type {import('next').NextConfig} */
@@ -33,7 +35,7 @@ module.exports = nextConfig;
 Implications:
 - Any `<ViewTransition>` with `default="auto"` (the implicit default) fires the browser's cross-fade on **every** `<Link>` navigation.
 - Combined with per-page `<ViewTransition>` components (Suspense reveals, item animations), this produces competing animations.
-- Without this flag, only `Suspense`-triggered and `startTransition`-triggered transitions fire.
+- Without this flag, `<ViewTransition>` still works for all `startTransition`- and `Suspense`-triggered updates — only `<Link>` navigations won't participate.
 
 The `<ViewTransition>` component is currently available in `react@canary` and `react@experimental` only:
 
@@ -101,7 +103,7 @@ Only the `<main>` content animates when navigating between dashboard sub-routes.
 
 ## The `transitionTypes` Prop on `next/link`
 
-As of Next.js 16.2+, `next/link` supports a native `transitionTypes` prop. This eliminates the need for custom wrapper components that intercept navigation with `onNavigate` + `startTransition` + `addTransitionType` + `router.push()`.
+`next/link` supports a native `transitionTypes` prop. This eliminates the need for custom wrapper components that intercept navigation with `onNavigate` + `startTransition` + `addTransitionType` + `router.push()`.
 
 ### Before (manual wrapper, requires `'use client'`)
 

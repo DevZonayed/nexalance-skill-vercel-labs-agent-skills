@@ -340,6 +340,18 @@ Triggering the reorder inside `startTransition` will smoothly animate each item 
 
 **How it works:** `startTransition` doesn't need async work to animate. The View Transition API captures a "before" snapshot of the DOM, then React applies the state update, and the API captures an "after" snapshot. As long as items change position between snapshots, the animation runs — even for purely synchronous local state changes like sorting.
 
+### Force Re-Enter with `key`
+
+Use a `key` prop on `<ViewTransition>` to force an enter/exit animation when a value changes — even if the component itself doesn't unmount:
+
+```jsx
+<ViewTransition key={searchParams.toString()} enter="slide-up" exit="slide-down" default="none">
+  <ResultsGrid results={results} />
+</ViewTransition>
+```
+
+When the key changes, React unmounts and remounts the `<ViewTransition>`, which triggers exit on the old instance and enter on the new one. This is useful for animating content swaps driven by URL parameters, tab switches, or any state change where the content identity changes but the component type stays the same.
+
 ### Animate Suspense Fallback to Content
 
 Wrap `<Suspense>` in `<ViewTransition>` to cross-fade from fallback to loaded content:
@@ -434,7 +446,9 @@ The exception is **shared element transitions** — these intentionally span lev
 
 ## Next.js Integration
 
-Next.js supports React View Transitions. Enable it in `next.config.js` (or `next.config.ts`):
+Next.js supports React View Transitions. `<ViewTransition>` works out of the box for `startTransition`- and `Suspense`-triggered updates — no config needed.
+
+To also animate `<Link>` navigations, enable the experimental flag in `next.config.js` (or `next.config.ts`):
 
 ```js
 const nextConfig = {
@@ -445,7 +459,7 @@ const nextConfig = {
 module.exports = nextConfig;
 ```
 
-**What this flag does:** It wraps every `<Link>` navigation in `document.startViewTransition`, so all mounted `<ViewTransition>` components participate in every link click — not just `startTransition`/Suspense-triggered ones. This makes the composition rules in "How Multiple `<ViewTransition>`s Interact" especially important: use `default="none"` on layout-level `<ViewTransition>`s to avoid competing animations.
+**What this flag does:** It wraps every `<Link>` navigation in `document.startViewTransition`, so all mounted `<ViewTransition>` components participate in every link click. Without this flag, only `startTransition`/`Suspense`-triggered transitions animate. This makes the composition rules in "How Multiple `<ViewTransition>`s Interact" especially important: use `default="none"` on layout-level `<ViewTransition>`s to avoid competing animations.
 
 For a detailed guide including App Router patterns and Server Component considerations, see `references/nextjs.md`.
 
@@ -490,8 +504,10 @@ Always respect `prefers-reduced-motion`. React does not disable animations autom
 ```css
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(*),
-  ::view-transition-new(*) {
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
     animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
 ```
