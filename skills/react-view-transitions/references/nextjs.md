@@ -45,12 +45,14 @@ npm install react@canary react-dom@canary
 
 ---
 
-## Basic Route Transitions
+## Layout-Level ViewTransition
 
-The simplest approach is wrapping your page content in `<ViewTransition>` inside a layout:
+**If your pages already have `<ViewTransition>` components (Suspense reveals, item reorder, shared elements), do NOT add a layout-level `<ViewTransition>` wrapping `{children}` with `default="auto"`.** Both levels fire simultaneously inside a single `document.startViewTransition` — the layout cross-fades the entire old page while the new page's own animations run at the same time. The result is competing, broken-looking animations.
+
+This is the most common view transition mistake in Next.js. Every developer tries this first:
 
 ```tsx
-// app/layout.tsx
+// app/layout.tsx — ONLY use this if pages have NO per-page ViewTransitions
 import { ViewTransition } from 'react';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -67,17 +69,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-When users navigate between routes using `<Link>`, Next.js triggers a transition internally. The `<ViewTransition>` wrapping `{children}` detects the content swap and animates it with the default cross-fade.
+This works for simple apps where pages have **no** `<ViewTransition>` components of their own. The layout detects the content swap on navigation and applies the default cross-fade.
 
-> **Warning:** This is an either/or choice with per-page animations. If your pages already have their own `<ViewTransition>` components (Suspense reveals, item reorder, shared elements), a layout-level VT on `{children}` produces double-animation — the layout cross-fades the entire old page while the new page's own entrance animations run simultaneously. Both levels get independent `view-transition-name`s, and the browser animates them in parallel, not sequentially.
->
-> Use this pattern only in apps where pages have **no** per-page view transitions. Otherwise, either remove the layout-level VT or set `default="none"` on it.
+**But the moment any page adds its own `<ViewTransition>` (a Suspense slide-up, an item reorder, a shared element), remove the layout-level one or set `default="none"` on it.** Otherwise both levels animate in parallel, not sequentially.
 
----
-
-## Layout-Level ViewTransition
-
-For more control, place `<ViewTransition>` at different levels of the layout hierarchy:
+For apps that need layout-level control, use `default="none"` and only activate for specific `transitionTypes`:
 
 ```tsx
 // app/dashboard/layout.tsx
@@ -87,17 +83,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="dashboard">
       <Sidebar />
-      <ViewTransition enter="slide-up" exit="fade-out">
-        <main>{children}</main>
-      </ViewTransition>
+      <main>
+        <ViewTransition
+          default="none"
+          enter={{
+            'nav-forward': 'nav-forward',
+            'nav-back': 'nav-back',
+            default: 'none',
+          }}
+          exit={{
+            'nav-forward': 'nav-forward',
+            'nav-back': 'nav-back',
+            default: 'none',
+          }}
+        >
+          {children}
+        </ViewTransition>
+      </main>
     </div>
   );
 }
 ```
 
-Only the `<main>` content animates when navigating between dashboard sub-routes. The sidebar stays static.
+Only the content area animates, only when explicit navigation types are present, and the sidebar stays static.
 
-> **Caution:** The same composition rule applies here — if the pages rendered inside `{children}` have their own `<ViewTransition>` components (Suspense boundaries, item animations), both levels will fire simultaneously. Use `default="none"` on the layout VT and only activate it for specific `transitionTypes` to avoid conflicts.
+**Even with `default="none"`, a layout-level directional slide will fire simultaneously with any per-page Suspense `<ViewTransition>`s.** If a page has `<ViewTransition enter="slide-up">` on a Suspense boundary, and the layout slides in from the right, both run at once — producing a diagonal movement. If your pages use Suspense reveals with `<ViewTransition>`, directional layout transitions usually hurt more than they help — the Suspense slide-up/slide-down already communicates "new content loading."
 
 ---
 
@@ -234,36 +244,9 @@ export function NavigateButton({
 }
 ```
 
-Configure `<ViewTransition>` to respond to these types. Use `default="none"` so the layout VT stays silent during per-page Suspense transitions and only fires for explicit navigation types:
+Configure `<ViewTransition>` in the layout to respond to these types. See the Layout-Level ViewTransition section above for the `default="none"` pattern with type-keyed `enter`/`exit` maps.
 
-```tsx
-// app/layout.tsx
-import { ViewTransition } from 'react';
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <ViewTransition
-          default="none"
-          enter={{
-            'navigation-forward': 'slide-in-from-right',
-            'navigation-back': 'slide-in-from-left',
-            default: 'none',
-          }}
-          exit={{
-            'navigation-forward': 'slide-out-to-left',
-            'navigation-back': 'slide-out-to-right',
-            default: 'none',
-          }}
-        >
-          {children}
-        </ViewTransition>
-      </body>
-    </html>
-  );
-}
-```
+**When to skip directional nav transitions:** If your pages already use Suspense reveals with `<ViewTransition>` (priority #2 in the Hierarchy of Animation Intent), adding route-level directional transitions (priority #5) usually hurts more than it helps. The Suspense slide-up/slide-down already communicates "new content loading" — adding a horizontal slide on top produces a diagonal movement where both animations fight for attention. Prefer shared element transitions (#1) or just let Suspense handle it.
 
 ---
 
@@ -325,30 +308,26 @@ Only one `<ViewTransition>` with a given name can be mounted at a time. Since Ne
 
 ## Combining with Suspense and Loading States
 
-Next.js `loading.tsx` files create `<Suspense>` boundaries. Wrap them with `<ViewTransition>` for smooth fallback-to-content reveals:
+Next.js `loading.tsx` files create `<Suspense>` boundaries. Wrap them with `<ViewTransition>` for smooth fallback-to-content reveals. Place the Suspense `<ViewTransition>` in the page, not alongside a layout-level one:
 
 ```tsx
-// app/dashboard/layout.tsx
-import { ViewTransition } from 'react';
-import { Suspense } from 'react';
-
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="dashboard">
-      <Sidebar />
-      <ViewTransition>
-        <Suspense fallback={<DashboardSkeleton />}>
-          {children}
-        </Suspense>
-      </ViewTransition>
-    </div>
-  );
-}
+// In a page or page-level component — NOT in a layout that also has a ViewTransition on {children}
+<Suspense
+  fallback={
+    <ViewTransition exit="slide-down">
+      <DashboardSkeleton />
+    </ViewTransition>
+  }
+>
+  <ViewTransition default="none" enter="slide-up">
+    <DashboardContent />
+  </ViewTransition>
+</Suspense>
 ```
 
-The skeleton cross-fades into the actual content once it loads.
+The skeleton slides out, then the content slides in. `default="none"` on the content prevents it from re-animating on unrelated transitions.
 
-> **Important:** If you also have a layout-level `<ViewTransition>` wrapping `{children}` with `default="auto"`, it will fire simultaneously with this Suspense VT on every navigation, producing a double-animation. Either remove the layout-level VT, or set `default="none"` on it so it only responds to explicit `transitionTypes`.
+**Do not combine this with a layout-level `<ViewTransition>` that has `default="auto"`.** Both will fire simultaneously — the layout cross-fades the whole page while the Suspense boundary slides up content, producing a broken double-animation. If you need both, set `default="none"` on the layout-level one and only activate it for specific `transitionTypes`.
 
 ---
 

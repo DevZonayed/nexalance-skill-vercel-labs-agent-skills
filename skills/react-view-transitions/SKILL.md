@@ -206,6 +206,8 @@ React also adds all transition types as browser view transition types, enabling 
 }
 ```
 
+**Caveat:** `::view-transition-old(*)` and `::view-transition-new(*)` match **all** named view transition elements, not just the one you intend. If a Suspense `<ViewTransition>` has its own class-based animation (e.g., `enter="slide-up"`), the wildcard `*` selector can override it depending on CSS specificity. The class-based approach via `<ViewTransition>` props is safer because it only affects the specific boundary. Prefer class-based props for per-component animations and reserve `:active-view-transition-type()` for global, app-wide rules where you want all elements to animate the same way.
+
 ### Using Types with View Transition Events
 
 The `types` array is also available in event callbacks:
@@ -436,9 +438,9 @@ Without `default="none"`, a `<ViewTransition>` with `default="auto"` (the implic
 
 Pick the level that carries the most meaning for your app:
 
-- **App with per-page Suspense reveals and shared elements:** Don't add a layout-level `<ViewTransition>` on `{children}`. The pages already manage their own transitions. A layout-level cross-fade on top will double-animate.
+- **App with per-page Suspense reveals and shared elements:** Don't add a layout-level `<ViewTransition>` on `{children}`. The pages already manage their own transitions. A layout-level cross-fade on top will double-animate. This includes directional (forward/back) navigation — even with `default="none"`, a layout-level slide fires simultaneously with per-page Suspense slide-ups, producing a diagonal movement.
 - **Simple app with no per-page animations:** A layout-level `<ViewTransition>` with `default="auto"` on `{children}` gives you free cross-fades between routes.
-- **Mixed:** Use `default="none"` at the layout level and only activate it for specific `transitionTypes` (e.g., directional navigation). This way it stays silent during per-page Suspense transitions.
+- **Directional navigation only (no per-page VTs):** Use `default="none"` at the layout level and only activate it for specific `transitionTypes`. This works well when pages have no `<ViewTransition>` components of their own.
 
 The exception is **shared element transitions** — these intentionally span levels (one side unmounts while the other mounts) and don't conflict with other VTs because the `share` trigger takes precedence over `enter`/`exit`.
 
