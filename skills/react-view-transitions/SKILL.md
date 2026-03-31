@@ -343,8 +343,6 @@ For directional motion, give the fallback and content separate `<ViewTransition>
 
 **Why `exit` on the fallback and `enter` on the content?** When Suspense resolves, two things happen simultaneously in one transition: the fallback unmounts (exit) and the content mounts (enter). The fallback slides down and fades out while the content slides up and fades in — creating a smooth handoff. The staggered CSS timing (`enter` delays by the `exit` duration) ensures the skeleton leaves before new content arrives.
 
-**Skeleton dimensions should closely match the content.** If the skeleton renders 3 single-line items but the content renders 5 two-line items, the size difference between the old/new snapshots produces a jarring stagger rather than a smooth transition.
-
 ### Opt Out of Nested Animations
 
 Wrap children in `<ViewTransition update="none">` to prevent them from animating when a parent changes:
