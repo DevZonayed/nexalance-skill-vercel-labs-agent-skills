@@ -325,7 +325,9 @@ The simplest approach: wrap `<Suspense>` in a single `<ViewTransition>` for a ze
 </ViewTransition>
 ```
 
-For directional motion, give the fallback and content separate `<ViewTransition>`s. Use `default="none"` on the content to prevent re-animation on revalidation:
+**This only works reliably when the page has a single Suspense boundary and no other transitions.** The bare `<ViewTransition>` uses `default="auto"` implicitly, which means it participates in *every* `document.startViewTransition` on the page — not just its own Suspense resolve. If other Suspense boundaries, `useDeferredValue` updates, or navigations fire, this VT re-animates each time. For pages with multiple Suspense boundaries or any client components, use the split pattern below instead.
+
+For directional motion (or multi-Suspense pages), give the fallback and content separate `<ViewTransition>`s. Use `default="none"` on the content to prevent re-animation on revalidation:
 
 ```jsx
 <Suspense

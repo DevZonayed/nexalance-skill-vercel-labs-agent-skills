@@ -319,6 +319,12 @@ These are starting points. Test on low-end devices — animations that feel smoo
 **TypeScript error: "Property 'default' is missing in type 'ViewTransitionClassPerType'":**
 - When passing an object to `enter`/`exit`/`update`/`share`, TypeScript requires a `default` key in the object. This applies even if the component-level `default` prop is set. Always include `default: 'none'` (or `'auto'`) in type-keyed objects.
 
+**Sibling Suspense boundaries re-trigger each other's view transitions:**
+- With `experimental: { viewTransition: true }`, each Suspense resolution fires its own `document.startViewTransition`. A `<ViewTransition>` with `default="auto"` participates in **all** transitions on the page — not just its own Suspense resolve. If three Suspense boundaries resolve at different times, each one re-triggers every `default="auto"` VT on the page, producing repeated or staggered animations. Fix: use the split pattern with `default="none"` on the content `<ViewTransition>` and explicit `enter`/`exit` props — never rely on `default="auto"` on pages with multiple Suspense boundaries.
+
+**Cross-fade looks like a jump / stagger:**
+- If the Suspense fallback (skeleton) and the resolved content have different dimensions, the view transition captures different-sized before/after snapshots. The size change during the cross-fade produces a jarring shift. Fix: match the skeleton's item count, line heights, and overall dimensions to the real content as closely as possible.
+
 **Hash fragments cause scroll jumps during view transitions:**
 - Links with URL hash fragments (e.g., `/page#section`) trigger the browser's native scroll-to-anchor behavior during the navigation transition. This interferes with directional slide animations — the page scrolls to the anchor while simultaneously sliding horizontally, producing a diagonal jump. If you need to link to a specific section on a detail page, navigate without the hash and handle scroll/expansion programmatically after navigation completes.
 
