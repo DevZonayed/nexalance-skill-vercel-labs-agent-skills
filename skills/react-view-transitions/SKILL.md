@@ -46,12 +46,14 @@ Not everything should slide. Match the animation to the spatial relationship:
 
 When in doubt, use a bare `<ViewTransition>` (default cross-fade) or `default="none"`. Only add directional motion (slide-up, slide-from-right) when it communicates spatial meaning.
 
+**Hierarchical vs. lateral navigation:** Reserve directional `transitionTypes` (like `nav-forward` / `nav-back`) for hierarchical navigation — where the user drills deeper (list → detail) or backs out. For lateral/sibling navigation between pages at the same level (e.g., tab-to-tab or peer sections), use a bare `<ViewTransition>` (cross-fade) or `default="none"` — don't add `transitionTypes`. Directional slides on sibling links falsely imply spatial depth where none exists.
+
 ---
 
 ## Availability
 
 - `<ViewTransition>` and `addTransitionType` require `react@canary` or `react@experimental`. They are **not** in stable React (including 19.x). Before implementing, verify the project uses canary — check `package.json` for `"react": "canary"` or run `npm ls react`. If on stable, install canary: `npm install react@canary react-dom@canary`.
-- Browser support: Chromium 111+, with Firefox and Safari adding support. The API gracefully degrades — unsupported browsers skip the animation and apply the DOM change instantly.
+- Browser support: Chromium 111+, Firefox 144+, Safari 18.2+ (cross-document only). The API gracefully degrades — unsupported browsers skip the animation and apply the DOM change instantly.
 
 ---
 
@@ -69,7 +71,7 @@ import { ViewTransition } from 'react';
 </ViewTransition>
 ```
 
-React automatically assigns a unique `view-transition-name` to the nearest DOM node inside each `<ViewTransition>`, and calls `document.startViewTransition` behind the scenes. Never call `startViewTransition` yourself — React coordinates all view transitions and will interrupt external ones.
+React automatically assigns a unique `view-transition-name` to the nearest DOM node inside each `<ViewTransition>`, and calls `document.startViewTransition` behind the scenes. Never call `startViewTransition` yourself — React coordinates all view transitions and will interrupt external ones. React also waits up to 500ms for fonts to load and delays for images inside `<ViewTransition>` to avoid flicker.
 
 ### Animation Triggers
 
@@ -79,7 +81,7 @@ React decides which type of animation to run based on what changed:
 |---------|--------------|
 | **enter** | A `<ViewTransition>` is first inserted during a Transition |
 | **exit** | A `<ViewTransition>` is first removed during a Transition |
-| **update** | DOM mutations happen inside a `<ViewTransition>`, or the boundary changes size/position due to an immediate sibling |
+| **update** | DOM mutations happen inside a `<ViewTransition>`, or the boundary changes size/position due to an immediate sibling. With nested `<ViewTransition>`s, the mutation applies to the innermost one, not the parent |
 | **share** | A named `<ViewTransition>` unmounts and another with the same `name` mounts in the same Transition (shared element transition) |
 
 Only updates wrapped in `startTransition`, `useDeferredValue`, or `Suspense` activate `<ViewTransition>`. Regular `setState` updates immediately and does not animate.
@@ -204,13 +206,11 @@ Pass an object instead of a string to any activation prop. Keys are transition t
 </ViewTransition>
 ```
 
-The `default` key inside the object is the fallback when no type matches. If any type has the value `"none"`, the ViewTransition is disabled for that trigger.
+The `default` key inside the object is the fallback when no type matches.
 
 ### Using Types with CSS `:active-view-transition-type()`
 
-React adds transition types as browser view transition types, enabling pure CSS scoping with `:root:active-view-transition-type(type-name)`. **Caveat:** `::view-transition-old(*)` / `::view-transition-new(*)` match **all** named elements — the wildcard can override specific class-based animations. Prefer class-based props for per-component animations; reserve `:active-view-transition-type()` for global rules.
-
-The `types` array is also available as the second argument in event callbacks (`onEnter`, `onExit`, etc.) — see `references/patterns.md`.
+React adds transition types as browser view transition types, enabling CSS scoping with `:root:active-view-transition-type(type-name)`. **Caveat:** `::view-transition-old(*)` / `::view-transition-new(*)` match **all** named elements — prefer class-based props for per-component animations; reserve `:active-view-transition-type()` for global rules.
 
 ### Types and Suspense: When Types Are Available
 
@@ -259,13 +259,14 @@ Rules for shared element transitions:
 - Only one `<ViewTransition>` with a given `name` can be mounted at a time — use globally unique names (namespace with a prefix or module constant).
 - The "share" trigger takes precedence over "enter"/"exit".
 - If either side is outside the viewport, no pair forms and each side animates independently as enter/exit.
+- If a Suspense fallback appears between unmounting one side and mounting the other, no shared element pair forms.
 - Use a constant defined in a shared module to avoid name collisions.
 
 ---
 
 ## View Transition Events (JavaScript Animations)
 
-For imperative control with `onEnter`, `onExit`, `onUpdate`, `onShare` callbacks and the `instance` object (`.old`, `.new`, `.group`, `.imagePair`, `.name`), see `references/patterns.md`. Always return a cleanup function from event handlers. Only one event fires per `<ViewTransition>` per Transition — `onShare` takes precedence over `onEnter`/`onExit`.
+For imperative control with `onEnter`, `onExit`, `onUpdate`, `onShare` callbacks and the `instance` object, see `references/patterns.md`. Always return a cleanup function. `onShare` takes precedence over `onEnter`/`onExit`.
 
 ---
 
@@ -295,9 +296,7 @@ Wrap each item (not a wrapper div) in `<ViewTransition>` with a stable `key`:
 ))}
 ```
 
-Triggering the reorder inside `startTransition` will smoothly animate each item to its new position. Avoid wrapper `<div>`s between the list and `<ViewTransition>` — they block the reorder animation.
-
-**How it works:** `startTransition` doesn't need async work to animate. The View Transition API captures a "before" snapshot of the DOM, then React applies the state update, and the API captures an "after" snapshot. As long as items change position between snapshots, the animation runs — even for purely synchronous local state changes like sorting.
+Trigger the reorder inside `startTransition`. Avoid wrapper `<div>`s between the list and `<ViewTransition>` — they block the reorder animation. `startTransition` doesn't need async work — the View Transition API captures before/after snapshots and animates position changes, even for synchronous state changes like sorting.
 
 ### Force Re-Enter with `key`
 
@@ -309,9 +308,11 @@ Use a `key` prop on `<ViewTransition>` to force an enter/exit animation when a v
 </ViewTransition>
 ```
 
-When the key changes, React unmounts and remounts the `<ViewTransition>`, which triggers exit on the old instance and enter on the new one. This is useful for animating content swaps driven by URL parameters, tab switches, or any state change where the content identity changes but the component type stays the same.
+When the key changes, React unmounts and remounts the `<ViewTransition>`, triggering exit on the old instance and enter on the new one.
 
 **Caution with Suspense:** If the `<ViewTransition>` wraps a `<Suspense>`, changing the key remounts the entire Suspense boundary, re-triggering the data fetch. Only use `key` on `<ViewTransition>` outside of Suspense, or accept the refetch.
+
+**Alternative for tabs:** For tab switches within a persistent layout, omitting `key` keeps the `<ViewTransition>` mounted and triggers an update animation (cross-fade) instead of exit + enter — avoiding Suspense remount and refetch. See "Cross-Fade Without Remount" in `references/patterns.md`.
 
 ### Animate Suspense Fallback to Content
 
@@ -341,7 +342,7 @@ For directional motion, give the fallback and content separate `<ViewTransition>
 </Suspense>
 ```
 
-**Why `exit` on the fallback and `enter` on the content?** When Suspense resolves, two things happen simultaneously in one transition: the fallback unmounts (exit) and the content mounts (enter). The fallback slides down and fades out while the content slides up and fades in — creating a smooth handoff. The staggered CSS timing (`enter` delays by the `exit` duration) ensures the skeleton leaves before new content arrives.
+When Suspense resolves, the fallback unmounts (exit) and content mounts (enter) simultaneously. Staggered CSS timing (`enter` delays by the `exit` duration) ensures the skeleton leaves before new content arrives. Keep skeleton dimensions close to the real content — large size mismatches produce jarring staggers.
 
 ### Opt Out of Nested Animations
 
@@ -363,9 +364,7 @@ For more patterns (isolate persistent/floating elements, reusable animated colla
 
 ## How Multiple `<ViewTransition>`s Interact
 
-When a transition fires, **every** `<ViewTransition>` in the tree that matches the trigger participates simultaneously. Each gets its own `view-transition-name`, and the browser animates all of them inside a single `document.startViewTransition` call. They run in parallel, not sequentially.
-
-This means multiple `<ViewTransition>`s that fire during the **same** transition all animate at once. A layout-level cross-fade + a page-level slide-up + per-item reorder all running in the same `document.startViewTransition` produces competing animations. But `<ViewTransition>`s that fire in **different** transitions (e.g., navigation vs. a later Suspense resolve) don't compete — they animate at different moments.
+When a transition fires, **every** `<ViewTransition>` in the tree that matches the trigger participates simultaneously inside a single `document.startViewTransition` call. Multiple `<ViewTransition>`s in the **same** transition animate at once and can compete. `<ViewTransition>`s in **different** transitions (e.g., navigation vs. a later Suspense resolve) don't compete — they animate at different moments.
 
 ### Use `default="none"` Liberally
 
@@ -391,11 +390,9 @@ Prevent unintended animations by disabling the default trigger on ViewTransition
 </ViewTransition>
 ```
 
-**TypeScript note:** When passing an object to `enter`/`exit`, the `ViewTransitionClassPerType` type requires a `default` key. Always include `default: 'none'` (or `'auto'`) in the object — omitting it causes a type error even if the component-level `default` prop is set.
+**TypeScript note:** When passing an object to `enter`/`exit`, `ViewTransitionClassPerType` requires a `default` key — omitting it causes a type error even if the component-level `default` prop is set.
 
-Without `default="none"`, a `<ViewTransition>` with `default="auto"` (the implicit default) fires the browser's cross-fade on **every** transition — including ones triggered by child Suspense boundaries, `useDeferredValue` updates, or `startTransition` calls within the page.
-
-**Next.js revalidation:** This is especially important in Next.js — when `revalidateTag()` fires (from a Server Action, webhook, or polling), the page re-renders. Without `default="none"`, every `<ViewTransition>` in the tree re-animates: content slides up again, things flash. Always use `default="none"` on content `<ViewTransition>`s and only enable specific triggers (`enter`, `exit`) explicitly.
+Without `default="none"`, a `<ViewTransition>` fires the browser's cross-fade on **every** transition — including Suspense resolves, `useDeferredValue` updates, and `revalidateTag()` re-renders in Next.js. Always use `default="none"` on content `<ViewTransition>`s and only enable specific triggers explicitly.
 
 ### Two Patterns — Can Coexist with Proper Isolation
 
@@ -432,13 +429,11 @@ There are two distinct view transition patterns:
 </ViewTransition>
 ```
 
-**Always pair `enter` with `exit` on directional transitions.** Without an exit animation, the old page disappears instantly while the new one slides in at scroll position 0 — a jarring jump. The exit slide masks the scroll change within the transition snapshot because the old content animates out simultaneously.
+**Always pair `enter` with `exit` on directional transitions.** Without an exit animation, the old page disappears instantly while the new one slides in — a jarring jump.
 
-**When they DO conflict:** If both layers use `default="auto"`, or if a layout-level `<ViewTransition>` fires a cross-fade during the same transition as a page-level slide-up, they animate simultaneously and fight for attention. The conflict is about **same-moment** animations, not about using both patterns on the same page.
+**When they DO conflict:** If both layers use `default="auto"`, they animate simultaneously and fight for attention. The conflict is about **same-moment** animations, not about using both patterns on the same page. Place the outer directional `<ViewTransition>` in each **page component** — not in a layout (layouts persist and don't trigger enter/exit).
 
-Place the outer directional `<ViewTransition>` in each **page component** — not in a layout (layouts persist and don't trigger enter/exit). Per-page wrappers are the cleanest approach.
-
-Shared element transitions (`name` prop) work alongside either pattern because the `share` trigger takes precedence over `enter`/`exit`.
+Shared element transitions (`name` prop) work alongside either pattern because `share` takes precedence over `enter`/`exit`.
 
 ---
 
@@ -458,6 +453,8 @@ module.exports = nextConfig;
 ```
 
 **What this flag does:** It wraps every `<Link>` navigation in `document.startViewTransition`, so all mounted `<ViewTransition>` components participate in every link click. Without this flag, only `startTransition`/`Suspense`-triggered transitions animate. This makes the composition rules in "How Multiple `<ViewTransition>`s Interact" especially important: use `default="none"` on layout-level `<ViewTransition>`s to avoid competing animations.
+
+**Production warning:** As of Next.js 16, the `viewTransition` flag is experimental and the Next.js team advises against using it in production. The flag opts into React's experimental build. `<ViewTransition>` itself works without the flag for `startTransition`- and `Suspense`-triggered updates.
 
 For a detailed guide including App Router patterns and Server Component considerations, see `references/nextjs.md`.
 
@@ -498,6 +495,6 @@ Or disable specific animations conditionally in JavaScript events by checking th
 
 ## Reference Files
 
-- **`references/patterns.md`** — Real-world patterns (searchable grids, expand/collapse, type-safe helpers), animation timing, view transition events (JavaScript Animations API), and troubleshooting.
-- **`references/css-recipes.md`** — Ready-to-use CSS animation recipes (slide, fade, scale, directional nav, and combined patterns).
-- **`references/nextjs.md`** — Detailed Next.js integration guide with App Router patterns and Server Component considerations.
+- **`references/patterns.md`** — Patterns, animation timing, view transition events, and troubleshooting.
+- **`references/css-recipes.md`** — Ready-to-use CSS animation recipes.
+- **`references/nextjs.md`** — Next.js integration with App Router patterns and Server Component considerations.
