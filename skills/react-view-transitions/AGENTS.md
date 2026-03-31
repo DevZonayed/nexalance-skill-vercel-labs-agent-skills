@@ -254,12 +254,28 @@ Follow these steps in order when adding view transitions to an app.
 
 ## Step 1: Audit the App
 
-Scan the codebase and identify:
+Before writing any code, scan the codebase thoroughly. Search for:
 
-1. **Persistent elements** (headers, navbars, sidebars) — need `viewTransitionName` isolation
-2. **Navigation triggers** — classify as hierarchical (list → detail) or lateral (tab-to-tab)
-3. **`<Suspense>` boundaries** with fallback skeletons — candidates for reveal animations
-4. **Shared visual elements** on both source and target views — get named VTs with `share`
+- **Every `<Link>` and `router.push`** — open every file that contains one
+- **Every `<Suspense>` boundary** — check what its fallback renders
+- **Every page/route component** — each needs a VT placement decision
+- **Persistent elements** (headers, navbars, sidebars) — need `viewTransitionName` isolation
+- **Shared visual elements** on both source and target views
+- **Skeleton-to-content control pairs** — if a fallback renders a control that also exists in the real content, both need a matching `viewTransitionName`
+
+Then classify every navigation and produce a navigation map:
+
+```
+| Route           | Navigates to         | Direction    | VT pattern            |
+|-----------------|----------------------|--------------|-----------------------|
+| /               | /detail/[id]         | forward      | directional slide     |
+| /detail/[id]    | /                    | back         | directional slide     |
+| /detail/[id]    | /detail/[other]      | lateral      | key+share crossfade   |
+| /tab/[a]        | /tab/[b]             | lateral      | key+share crossfade   |
+| (Suspense)      | (content loads)      | —            | slide-up reveal       |
+```
+
+For each shared element (`name` prop), note where a pair forms and where it doesn't — this determines whether you need `enter`/`exit` as a fallback alongside `share`.
 
 ## Step 2: Add CSS Recipes
 
@@ -329,6 +345,16 @@ Use `default="none"` on content VT. Use simple string props (not type maps) — 
 
 **Rules:** Names must be globally unique. Add `default="none"` on list-side shared elements. Never use fade-out exit with shared morphs.
 
+## Step 7: Verify Each Navigation Path
+
+Walk through every row in the navigation map from Step 1:
+
+- Does the VT mount/unmount, or stay mounted (same-route)?
+- For named VTs: does a shared pair form? If not, does `enter`/`exit` provide a fallback?
+- Does `default="none"` block an animation you actually want?
+- Do persistent elements stay static?
+- Do Suspense reveals animate independently from directional navigations?
+
 ---
 
 ## Common Mistakes
@@ -339,6 +365,8 @@ Use `default="none"` on content VT. Use simple string props (not type maps) — 
 - **Writing custom animation CSS** — use the recipes
 - **Missing `default: "none"` in type-keyed objects** — TypeScript requires it, fallback is `"auto"`
 - **Type maps on Suspense reveals** — Suspense resolves have no type, use string props
+- **Raw `viewTransitionName` CSS to trigger animations** — React only starts view transitions when `<ViewTransition>` components are in the tree. Bare `viewTransitionName` is for isolating elements, not triggering animations.
+- **`update` trigger for same-route navigations** — nested VTs steal the mutation from the parent. Use `key` + `name` + `share` instead.
 
 For Next.js-specific steps, see the Next.js section below.
 

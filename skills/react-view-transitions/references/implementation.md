@@ -4,12 +4,28 @@ Follow these steps in order when adding view transitions to an app. Each step bu
 
 ## Step 1: Audit the App
 
-Before writing any code, scan the codebase and identify:
+Before writing any code, scan the codebase thoroughly. Search for:
 
-1. **Persistent elements** that stay on screen across navigations — headers, navbars, sidebars, sticky controls. These need isolation via `viewTransitionName`.
-2. **All navigation triggers** — classify each as hierarchical (list → detail, drilling deeper) or lateral (tab-to-tab, sibling pages at the same level). Only hierarchical navigations get `transitionTypes`.
-3. **All `<Suspense>` boundaries** with fallback skeletons — these are candidates for reveal animations.
-4. **Shared visual elements** that appear on both source and target views — images, cards, avatars that should morph between routes. These get named `<ViewTransition>` with `share`.
+- **Every `<Link>` and `router.push`** — these are your navigation triggers. Open every file that contains one.
+- **Every `<Suspense>` boundary** — each one is a candidate for a reveal animation. Check what its fallback renders.
+- **Every page/route component** — list them all. Each page needs a VT placement decision.
+- **Persistent elements** — headers, navbars, sidebars, sticky controls that stay on screen across navigations. These need `viewTransitionName` isolation.
+- **Shared visual elements** — images, cards, or avatars that appear on both a source and target view (e.g., a thumbnail in a list and the same image on a detail page).
+- **Skeleton-to-content control pairs** — if a Suspense fallback renders a control (search input, tab bar) that also exists in the real content, both need a matching `viewTransitionName`.
+
+Then classify every navigation and produce a navigation map:
+
+```
+| Route           | Navigates to         | Direction    | VT pattern            |
+|-----------------|----------------------|--------------|-----------------------|
+| /               | /detail/[id]         | forward      | directional slide     |
+| /detail/[id]    | /                    | back         | directional slide     |
+| /detail/[id]    | /detail/[other]      | lateral      | key+share crossfade   |
+| /tab/[a]        | /tab/[b]             | lateral      | key+share crossfade   |
+| (Suspense)      | (content loads)      | —            | slide-up reveal       |
+```
+
+For each shared element (`name` prop), note every navigation where a pair forms and where it doesn't — this determines whether you need `enter`/`exit` as a fallback alongside `share`.
 
 ## Step 2: Add CSS Recipes
 
@@ -138,6 +154,18 @@ For list items that should animate individually on enter/exit, add a per-item `<
 - Add `default="none"` on list-side shared elements to prevent per-item cross-fades on filter/search updates.
 - Never use a fade-out exit on pages with shared element morphs — the page dissolving conflicts with the morph, causing a flash. Use a directional slide exit instead.
 
+## Step 7: Verify Each Navigation Path
+
+Walk through every row in the navigation map from Step 1 and confirm:
+
+- Does the VT mount/unmount on this navigation, or does it stay mounted (same-route)?
+- For named VTs: does a shared pair form? If not, does `enter`/`exit` provide a fallback?
+- Does `default="none"` block an animation you actually want?
+- Do persistent elements stay static (not sliding with page content)?
+- Do Suspense reveals animate independently from directional navigations?
+
+If any path produces no animation or competing animations, revisit the relevant step.
+
 ---
 
 ## Common Mistakes
@@ -148,6 +176,8 @@ For list items that should animate individually on enter/exit, add a per-item `<
 - **Writing custom animation CSS** — the recipes in `css-recipes.md` handle staggered timing, motion blur on morphs, and reduced motion. Copy them; don't reinvent them.
 - **Missing `default: "none"` in type-keyed objects** — TypeScript requires a `default` key, and without it the fallback is `"auto"` which fires on every transition.
 - **Type maps on Suspense reveals** — Suspense resolves fire as separate transitions with no type. Type-keyed props won't match — use simple string props instead.
+- **Raw `viewTransitionName` CSS to trigger animations** — React only calls `document.startViewTransition` when `<ViewTransition>` components are in the tree. A bare `viewTransitionName` style is for isolating elements from a parent's snapshot, not for triggering animations.
+- **`update` trigger for same-route navigations** — nested VTs inside the content steal the mutation from the parent, so `update` never fires on the outer VT. Use `key` + `name` + `share` instead.
 
 ---
 
