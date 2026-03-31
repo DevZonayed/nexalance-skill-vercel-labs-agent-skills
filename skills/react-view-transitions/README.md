@@ -1,35 +1,41 @@
-# React View Transitions
+# React View Transitions Skill
 
-Guide for implementing smooth, native-feeling animations using React's View
-Transition API. Covers the `<ViewTransition>` component, `addTransitionType`,
-CSS view transition pseudo-elements, shared element transitions, and Next.js
-integration including the `transitionTypes` prop on `next/link`.
+An agent skill for implementing smooth, native-feeling animations using React's View Transition API.
 
-## Structure
+## What This Skill Covers
 
-- `SKILL.md` - Core skill instructions with references to sub-documents
-- `references/` - Supporting documentation
-  - `nextjs.md` - Next.js-specific patterns (App Router, `transitionTypes`, shared elements across routes)
-  - `css-recipes.md` - Ready-to-use CSS animation recipes (fade, slide, scale, flip, directional)
-- `metadata.json` - Skill metadata (version, organization, abstract)
-- **`AGENTS.md`** - Full compiled document with all references inlined
+- **`<ViewTransition>` component** — animation triggers (enter, exit, update, share), placement rules, View Transition Classes
+- **`addTransitionType`** — tagging transitions for directional or context-specific animations
+- **Shared element transitions** — morphing elements across different views
+- **View Transition Events** — imperative JavaScript animations via the Web Animations API
+- **CSS pseudo-elements** — `::view-transition-old`, `::view-transition-new`, `::view-transition-group`
+- **Next.js integration** — `experimental.viewTransition`, the `transitionTypes` prop on `next/link`, App Router patterns
+- **Accessibility** — `prefers-reduced-motion` handling
+- **Ready-to-use CSS recipes** — fade, slide, scale, flip, directional navigation
 
-## Topics Covered
+## Skill Structure
 
-- `<ViewTransition>` component (enter, exit, update, share triggers)
-- `addTransitionType` for directional/context-specific animations
-- View Transition Classes and CSS pseudo-elements
-- Shared element transitions with the `name` prop
-- JavaScript animations via Web Animations API (`onEnter`, `onExit`, `onUpdate`, `onShare`)
-- Next.js `transitionTypes` prop on `next/link` (Next.js 16.2+)
-- `useDeferredValue` + `ViewTransition` for search animations
-- Type-safe transition helpers
-- Accessibility (`prefers-reduced-motion`)
+```
+react-view-transition-skill/
+├── SKILL.md                      # Core skill (always loaded)
+└── references/
+    ├── patterns.md               # Real-world patterns, events API, troubleshooting
+    ├── nextjs.md                 # Next.js-specific patterns
+    └── css-recipes.md            # Copy-paste CSS animations
+```
 
-## References
+## Installation
+
+Install via [skills.sh](https://skills.sh):
+
+```bash
+npx skills install https://github.com/vercel-labs/react-view-transitions-skill
+```
+
+## Resources
 
 - [React `<ViewTransition>` docs](https://react.dev/reference/react/ViewTransition)
 - [React `addTransitionType` docs](https://react.dev/reference/react/addTransitionType)
 - [Next.js `viewTransition` config](https://nextjs.org/docs/app/api-reference/config/next-config-js/viewTransition)
 - [next16-conferences](https://github.com/aurorascharff/next16-conferences) — real-world example app
-- [Next.js App Router Playground](https://github.com/vercel/next-app-router-playground/tree/main/app/view-transitions) — Vercel's reference implementation
+- [Next.js App Router Playground (view transitions)](https://github.com/vercel/next-app-router-playground/tree/main/app/view-transitions) — Vercel's reference implementation

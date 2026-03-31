@@ -311,6 +311,8 @@ Use a `key` prop on `<ViewTransition>` to force an enter/exit animation when a v
 
 When the key changes, React unmounts and remounts the `<ViewTransition>`, which triggers exit on the old instance and enter on the new one. This is useful for animating content swaps driven by URL parameters, tab switches, or any state change where the content identity changes but the component type stays the same.
 
+**Caution with Suspense:** If the `<ViewTransition>` wraps a `<Suspense>`, changing the key remounts the entire Suspense boundary, re-triggering the data fetch. Only use `key` on `<ViewTransition>` outside of Suspense, or accept the refetch.
+
 ### Animate Suspense Fallback to Content
 
 Wrap `<Suspense>` in a bare `<ViewTransition>` for a simple cross-fade, or give fallback and content separate `<ViewTransition>`s for directional motion. Use `default="none"` on the content to prevent re-animation on revalidation:
@@ -330,6 +332,8 @@ Wrap `<Suspense>` in a bare `<ViewTransition>` for a simple cross-fade, or give 
 ```
 
 **Why `exit` on the fallback and `enter` on the content?** When Suspense resolves, two things happen simultaneously in one transition: the fallback unmounts (exit) and the content mounts (enter). The fallback slides down and fades out while the content slides up and fades in — creating a smooth handoff. The staggered CSS timing (`enter` delays by the `exit` duration) ensures the skeleton leaves before new content arrives.
+
+**Skeleton dimensions should closely match the content.** If the skeleton renders 3 single-line items but the content renders 5 two-line items, the size difference between the old/new snapshots produces a jarring stagger rather than a smooth transition.
 
 ### Opt Out of Nested Animations
 
