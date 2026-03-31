@@ -315,7 +315,17 @@ When the key changes, React unmounts and remounts the `<ViewTransition>`, which 
 
 ### Animate Suspense Fallback to Content
 
-Wrap `<Suspense>` in a bare `<ViewTransition>` for a simple cross-fade, or give fallback and content separate `<ViewTransition>`s for directional motion. Use `default="none"` on the content to prevent re-animation on revalidation:
+The simplest approach: wrap `<Suspense>` in a single `<ViewTransition>` for a zero-config cross-fade from skeleton to content:
+
+```jsx
+<ViewTransition>
+  <Suspense fallback={<Skeleton />}>
+    <Content />
+  </Suspense>
+</ViewTransition>
+```
+
+For directional motion, give the fallback and content separate `<ViewTransition>`s. Use `default="none"` on the content to prevent re-animation on revalidation:
 
 ```jsx
 <Suspense
