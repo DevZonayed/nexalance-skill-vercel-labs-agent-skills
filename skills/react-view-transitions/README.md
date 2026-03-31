@@ -19,6 +19,7 @@ An agent skill for implementing smooth, native-feeling animations using React's 
 react-view-transition-skill/
 ├── SKILL.md                      # Core skill (always loaded)
 └── references/
+    ├── implementation.md         # Step-by-step implementation workflow
     ├── patterns.md               # Real-world patterns, events API, troubleshooting
     ├── nextjs.md                 # Next.js-specific patterns
     └── css-recipes.md            # Copy-paste CSS animations
