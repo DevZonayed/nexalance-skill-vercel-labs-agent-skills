@@ -77,13 +77,13 @@ This works for simple apps where pages have **no** `<ViewTransition>` components
 If you need the layout to stay silent while pages manage their own animations, use `default="none"`:
 
 ```tsx
-// app/dashboard/layout.tsx — prevents layout from interfering with per-page VTs
+// app/[section]/layout.tsx — prevents layout from interfering with per-page VTs
 import { ViewTransition } from 'react';
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function SectionLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="dashboard">
-      <Sidebar />
+    <div>
+      <nav>{/* persistent navigation */}</nav>
       <main>
         <ViewTransition default="none">
           {children}
@@ -356,12 +356,12 @@ Next.js `loading.tsx` files create `<Suspense>` boundaries. Wrap them with `<Vie
 <Suspense
   fallback={
     <ViewTransition exit="slide-down">
-      <DashboardSkeleton />
+      <PageSkeleton />
     </ViewTransition>
   }
 >
   <ViewTransition default="none" enter="slide-up">
-    <DashboardContent />
+    <PageContent />
   </ViewTransition>
 </Suspense>
 ```

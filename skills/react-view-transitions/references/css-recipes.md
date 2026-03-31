@@ -275,14 +275,29 @@ Usage:
 
 ## Persistent Element Isolation
 
-Prevent sticky headers, navbars, and sidebars from being captured in page content's transition snapshot. Give them a `viewTransitionName` in JSX, then disable animation on their group:
+Prevent persistent elements (sticky headers, navbars, sidebars, toolbars) from being captured in page content's transition snapshot. Give them a `viewTransitionName` in JSX, then disable animation on their group:
 
 ```css
-::view-transition-group(dashboard-header) {
+::view-transition-group(persistent-nav) {
   animation: none;
   z-index: 100;
 }
 ```
+
+### Backdrop-Blur Workaround
+
+Elements with `backdrop-blur` or `backdrop-filter` can flash during the cross-fade — the old snapshot may render the blur incorrectly or not at all (browser-dependent). To avoid the cross-fade entirely, hide the old snapshot and disable animation on the new one:
+
+```css
+::view-transition-old(persistent-nav) {
+  display: none;
+}
+::view-transition-new(persistent-nav) {
+  animation: none;
+}
+```
+
+Use instead of the group-level fix when the isolated element uses composited effects like `backdrop-filter`.
 
 ---
 

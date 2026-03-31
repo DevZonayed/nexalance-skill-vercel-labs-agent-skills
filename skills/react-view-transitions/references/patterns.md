@@ -30,6 +30,20 @@ export default function SearchableGrid({ itemsPromise }) {
 }
 ```
 
+### Named Shared Elements Inside `useDeferredValue` Lists
+
+Per-item `<ViewTransition name={...} share="morph">` inside a `useDeferredValue`-driven list triggers update animations on every keystroke — each named element gets its own cross-fade, which can look noisy or washed-out. The searchable grid above avoids this with a single unnamed `<ViewTransition>`. If you need per-item shared elements (for card-to-detail morph), add `default="none"`:
+
+```tsx
+{filteredItems.map(item => (
+  <ViewTransition key={item.id} name={`item-${item.id}`} share="morph" default="none">
+    <ItemCard item={item} />
+  </ViewTransition>
+))}
+```
+
+The morph still fires on navigation when the element unmounts and a matching `name` mounts elsewhere.
+
 ## Card Expand/Collapse with `startTransition`
 
 Toggle between a card grid and a detail view using `startTransition` to animate the swap. Add a shared element `name` to morph the card into the detail view:
@@ -100,32 +114,46 @@ export function HorizontalTransition({ children, enter, exit }: {
 
 These wrappers enforce that only valid transition IDs and animation classes are used, catching mistakes at compile time.
 
+## Cross-Fade Without Remount (Alternative to `key` for Tabs)
+
+For tab switches within a persistent layout, omitting `key` keeps the `<ViewTransition>` mounted and triggers an update animation (cross-fade) instead of exit + enter. This avoids remounting Suspense boundaries and refetching data:
+
+```jsx
+<ViewTransition>
+  <TabPanel tab={activeTab} />
+</ViewTransition>
+```
+
+Use `key` when content identity changes and you want a full re-enter animation (component state resets). Omit `key` for cross-fades within a persistent container (tabs, panels, carousel slides).
+
 ## Shared Elements Across Routes in Next.js
 
 See `nextjs.md` (Shared Elements Across Routes) for complete examples using `transitionTypes` on `next/link` combined with shared element `<ViewTransition name={...}>` for list-to-detail image morph animations.
 
 ## Isolate Elements from Parent Animations
 
-### Persistent Layout Elements (Headers, Sidebars)
+### Persistent Layout Elements (Headers, Sidebars, Toolbars)
 
-Sticky headers, navbars, and sidebars that persist across navigations get captured in the page content's transition snapshot. When a directional slide animates the page, the header slides away with it — which looks broken.
+Elements that persist across navigations (sticky headers, navbars, sidebars, toolbars) get captured in the page content's transition snapshot. When a directional slide animates the page, the persistent element slides away with it — which looks broken.
 
 Fix: give persistent elements their own `viewTransitionName` and disable animation on their transition group:
 
 ```jsx
-<header style={{ viewTransitionName: "dashboard-header" }}>
-  {/* header content */}
-</header>
+<nav style={{ viewTransitionName: "persistent-nav" }}>
+  {/* persistent element content */}
+</nav>
 ```
 
 ```css
-::view-transition-group(dashboard-header) {
+::view-transition-group(persistent-nav) {
   animation: none;
   z-index: 100;
 }
 ```
 
-This isolates the header into its own transition group that stays static during page slides. The element won't be included in the page content's old/new snapshot.
+This isolates the element into its own transition group that stays static during page slides. It won't be included in the page content's old/new snapshot.
+
+For elements with `backdrop-blur` or `backdrop-filter`, see the Backdrop-Blur Workaround in `css-recipes.md`.
 
 ### Floating Elements (Popovers, Tooltips)
 
@@ -150,6 +178,20 @@ For a global fix that ensures all view transition groups render above normal con
   z-index: 100;
 }
 ```
+
+## Shared Controls Between Skeleton and Content
+
+When a Suspense fallback mirrors controls from the real content (search input, tab bar, filter row), give them the same `viewTransitionName` to form a shared element pair. Without this, the skeleton control slides away while the real one pops in independently:
+
+```jsx
+// In fallback skeleton:
+<input disabled placeholder="Search..." style={{ viewTransitionName: 'search-input' }} />
+
+// In real content:
+<input placeholder="Search..." style={{ viewTransitionName: 'search-input' }} />
+```
+
+The matching name morphs the skeleton control into the real one in place. Ensure the element with manual `viewTransitionName` is not the root DOM node inside a `<ViewTransition>` — React applies its auto-generated name to the root node, which would override the manual one.
 
 ## Reusable Animated Collapse
 
@@ -321,6 +363,18 @@ These are starting points. Test on low-end devices — animations that feel smoo
 
 **Hash fragments cause scroll jumps during view transitions:**
 - Links with URL hash fragments (e.g., `/page#section`) trigger the browser's native scroll-to-anchor behavior during the navigation transition. This interferes with directional slide animations — the page scrolls to the anchor while simultaneously sliding horizontally, producing a diagonal jump. If you need to link to a specific section on a detail page, navigate without the hash and handle scroll/expansion programmatically after navigation completes.
+
+**Backdrop-blur flickers on isolated persistent elements:**
+- `backdrop-blur` / `backdrop-filter` can render incorrectly in the old snapshot (browser-dependent), causing a flash during cross-fade. Fix: `::view-transition-old(name) { display: none }` + `::view-transition-new(name) { animation: none }`. See Backdrop-Blur Workaround in `css-recipes.md`.
+
+**Named shared elements animate on every `useDeferredValue` update:**
+- Per-item `<ViewTransition>` in a deferred list triggers per-item cross-fades on every keystroke. Fix: `default="none"` on each inner `<ViewTransition>`. See "Named Shared Elements Inside `useDeferredValue` Lists" above.
+
+**`border-radius` lost during list reorder or shared element transitions:**
+- Snapshots are placed in a flat pseudo-tree, losing the parent's clip. If `border-radius` comes from a parent's `overflow: hidden`, the snapshot shows square corners. Fix: apply `border-radius` directly to the captured element. Alternative: nested view transition groups (`view-transition-group: parent`, Chrome 140+) restore the hierarchy.
+
+**Skeleton controls slide away while real controls pop in independently:**
+- Give matching controls in fallback and content the same `viewTransitionName`. See "Shared Controls Between Skeleton and Content" above.
 
 **Batching:**
 - If multiple updates occur while an animation is running, React batches them into one. For example: if you navigate A→B, then B→C, then C→D during the first animation, the next animation will go B→D.
