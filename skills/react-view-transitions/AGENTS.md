@@ -204,7 +204,7 @@ The `default` key inside the object is the fallback when no type matches. If any
 
 React adds transition types as browser view transition types, enabling pure CSS scoping with `:root:active-view-transition-type(type-name)`. **Caveat:** `::view-transition-old(*)` / `::view-transition-new(*)` match **all** named elements — the wildcard can override specific class-based animations. Prefer class-based props for per-component animations; reserve `:active-view-transition-type()` for global rules.
 
-The `types` array is also available as the second argument in event callbacks (`onEnter`, `onExit`, etc.) — see `references/patterns.md`.
+The `types` array is also available as the second argument in event callbacks (`onEnter`, `onExit`, etc.) — see **Patterns and Guidelines** below.
 
 ### Types and Suspense: When Types Are Available
 
@@ -259,7 +259,7 @@ Rules for shared element transitions:
 
 ## View Transition Events (JavaScript Animations)
 
-For imperative control with `onEnter`, `onExit`, `onUpdate`, `onShare` callbacks and the `instance` object (`.old`, `.new`, `.group`, `.imagePair`, `.name`), see `references/patterns.md`. Always return a cleanup function from event handlers. Only one event fires per `<ViewTransition>` per Transition — `onShare` takes precedence over `onEnter`/`onExit`.
+For imperative control with `onEnter`, `onExit`, `onUpdate`, `onShare` callbacks and the `instance` object (`.old`, `.new`, `.group`, `.imagePair`, `.name`), see **Patterns and Guidelines** below. Always return a cleanup function from event handlers. Only one event fires per `<ViewTransition>` per Transition — `onShare` takes precedence over `onEnter`/`onExit`.
 
 ---
 
@@ -319,9 +319,7 @@ The simplest approach: wrap `<Suspense>` in a single `<ViewTransition>` for a ze
 </ViewTransition>
 ```
 
-**This only works reliably when the page has a single Suspense boundary and no other transitions.** The bare `<ViewTransition>` uses `default="auto"` implicitly, which means it participates in *every* `document.startViewTransition` on the page — not just its own Suspense resolve. If other Suspense boundaries, `useDeferredValue` updates, or navigations fire, this VT re-animates each time. For pages with multiple Suspense boundaries or any client components, use the split pattern below instead.
-
-For directional motion (or multi-Suspense pages), give the fallback and content separate `<ViewTransition>`s. Use `default="none"` on the content to prevent re-animation on revalidation:
+For directional motion, give the fallback and content separate `<ViewTransition>`s. Use `default="none"` on the content to prevent re-animation on revalidation:
 
 ```jsx
 <Suspense
@@ -355,7 +353,7 @@ Wrap children in `<ViewTransition update="none">` to prevent them from animating
 </ViewTransition>
 ```
 
-For more patterns (isolate persistent/floating elements, reusable animated collapse, preserve state with `<Activity>`, exclude elements with `useOptimistic`), see `references/patterns.md`.
+For more patterns (isolate persistent/floating elements, reusable animated collapse, preserve state with `<Activity>`, exclude elements with `useOptimistic`), see **Patterns and Guidelines** below.
 
 ---
 
@@ -457,7 +455,7 @@ module.exports = nextConfig;
 
 **What this flag does:** It wraps every `<Link>` navigation in `document.startViewTransition`, so all mounted `<ViewTransition>` components participate in every link click. Without this flag, only `startTransition`/`Suspense`-triggered transitions animate. This makes the composition rules in "How Multiple `<ViewTransition>`s Interact" especially important: use `default="none"` on layout-level `<ViewTransition>`s to avoid competing animations.
 
-For a detailed guide including App Router patterns and Server Component considerations, see `references/nextjs.md`.
+For a detailed guide including App Router patterns and Server Component considerations, see **View Transitions in Next.js** below.
 
 Key points:
 - The `<ViewTransition>` component is imported from `react` directly — no Next.js-specific import.
@@ -471,7 +469,7 @@ Key points:
 <Link href="/products/1" transitionTypes={['transition-to-detail']}>View Product</Link>
 ```
 
-For full examples with shared element transitions and directional animations, see `references/nextjs.md`.
+For full examples with shared element transitions and directional animations, see **View Transitions in Next.js** below.
 
 ---
 
@@ -569,7 +567,7 @@ export default function ItemGrid({ items }) {
 }
 ```
 
-The shared `name={`item-${id}`}` on both the card and detail `<ViewTransition>` creates a shared element pair — the card morphs into the detail view. The `scrollRef` saves and restores scroll position so users return to where they were in the grid. See `css-recipes.md` for the slide-up/slide-down CSS.
+The shared `name={`item-${id}`}` on both the card and detail `<ViewTransition>` creates a shared element pair — the card morphs into the detail view. The `scrollRef` saves and restores scroll position so users return to where they were in the grid. See **CSS Animation Recipes** below for the slide-up/slide-down CSS.
 
 ## Type-Safe Transition Helpers
 
@@ -598,7 +596,7 @@ These wrappers enforce that only valid transition IDs and animation classes are 
 
 ## Shared Elements Across Routes in Next.js
 
-See `nextjs.md` (Shared Elements Across Routes) for complete examples using `transitionTypes` on `next/link` combined with shared element `<ViewTransition name={...}>` for list-to-detail image morph animations.
+See **View Transitions in Next.js** below (Shared Elements Across Routes) for complete examples using `transitionTypes` on `next/link` combined with shared element `<ViewTransition name={...}>` for list-to-detail image morph animations.
 
 ## Isolate Elements from Parent Animations
 
@@ -814,12 +812,6 @@ These are starting points. Test on low-end devices — animations that feel smoo
 
 **TypeScript error: "Property 'default' is missing in type 'ViewTransitionClassPerType'":**
 - When passing an object to `enter`/`exit`/`update`/`share`, TypeScript requires a `default` key in the object. This applies even if the component-level `default` prop is set. Always include `default: 'none'` (or `'auto'`) in type-keyed objects.
-
-**Sibling Suspense boundaries re-trigger each other's view transitions:**
-- With `experimental: { viewTransition: true }`, each Suspense resolution fires its own `document.startViewTransition`. A `<ViewTransition>` with `default="auto"` participates in **all** transitions on the page — not just its own Suspense resolve. If three Suspense boundaries resolve at different times, each one re-triggers every `default="auto"` VT on the page, producing repeated or staggered animations. Fix: use the split pattern with `default="none"` on the content `<ViewTransition>` and explicit `enter`/`exit` props — never rely on `default="auto"` on pages with multiple Suspense boundaries.
-
-**Cross-fade looks like a jump / stagger:**
-- If the Suspense fallback (skeleton) and the resolved content have different dimensions, the view transition captures different-sized before/after snapshots. The size change during the cross-fade produces a jarring shift. Fix: match the skeleton's item count, line heights, and overall dimensions to the real content as closely as possible.
 
 **Hash fragments cause scroll jumps during view transitions:**
 - Links with URL hash fragments (e.g., `/page#section`) trigger the browser's native scroll-to-anchor behavior during the navigation transition. This interferes with directional slide animations — the page scrolls to the anchor while simultaneously sliding horizontally, producing a diagonal jump. If you need to link to a specific section on a detail page, navigate without the hash and handle scroll/expansion programmatically after navigation completes.
