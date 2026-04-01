@@ -144,16 +144,7 @@ If `default` is `"none"`, all triggers are off unless explicitly listed.
 
 ## Transition Types
 
-Tag transitions with `addTransitionType` so VTs can pick different animations:
-
-```jsx
-startTransition(() => {
-  addTransitionType('nav-forward');
-  router.push('/detail/1');
-});
-```
-
-You can call `addTransitionType` multiple times in one transition to stack types. Different VTs in the tree can react to different types:
+Tag transitions with `addTransitionType` so VTs can pick different animations. Call it multiple times to stack types — different VTs in the tree react to different types:
 
 ```jsx
 startTransition(() => {
@@ -163,7 +154,7 @@ startTransition(() => {
 });
 ```
 
-Map types to CSS classes. This works on `enter`, `exit`, **and** `share`:
+Map types to CSS classes. Works on `enter`, `exit`, **and** `share`:
 
 ```jsx
 <ViewTransition
@@ -180,7 +171,7 @@ Map types to CSS classes. This works on `enter`, `exit`, **and** `share`:
 
 ### `router.back()` and Browser Back Button
 
-`router.back()` does **not** trigger view transitions — the browser's `popstate` event is synchronous and incompatible with `document.startViewTransition`. Use `router.push()` with an explicit URL instead. The browser's native back/forward buttons also skip animations (a browser/router limitation, not fixable in app code).
+`router.back()` and the browser's back/forward buttons do **not** trigger view transitions (`popstate` is synchronous, incompatible with `startViewTransition`). Use `router.push()` with an explicit URL instead.
 
 ### Types and Suspense
 
@@ -854,7 +845,11 @@ Works in Server Components, no wrapper needed:
 <Link href="/products/1" transitionTypes={['nav-forward']}>View</Link>
 ```
 
-**Availability:** May not exist in all Next.js versions. If unavailable, use `startTransition` + `addTransitionType` + `router.push()`. Reserve manual `startTransition` for non-link interactions.
+**Availability:** Requires `experimental.viewTransition: true`. Available in Next.js 15+ canary builds and Next.js 16+. If unavailable, use `startTransition` + `addTransitionType` + `router.push()`. To check: `grep -r "transitionTypes" node_modules/next/dist/`. Reserve manual `startTransition` for non-link interactions.
+
+## `loading.tsx` as Suspense Boundary
+
+Next.js `loading.tsx` files are implicit `<Suspense>` boundaries. Wrap the skeleton in `<ViewTransition exit="...">` in `loading.tsx`, and the content in `<ViewTransition enter="..." default="none">` in the page. This is the Next.js-idiomatic equivalent of explicit `<Suspense fallback={...}>`. Same rules apply: use simple string props (not type maps) since Suspense reveals fire without transition types.
 
 ## Two-Layer Pattern (Directional + Suspense)
 

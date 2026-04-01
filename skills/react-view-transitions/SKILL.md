@@ -123,16 +123,7 @@ See `references/css-recipes.md` for ready-to-use animation recipes.
 
 ## Transition Types
 
-Tag transitions with `addTransitionType` so VTs can pick different animations based on context:
-
-```jsx
-startTransition(() => {
-  addTransitionType('nav-forward');
-  router.push('/detail/1');
-});
-```
-
-You can call `addTransitionType` multiple times in one transition to stack types. Different VTs in the tree can react to different types:
+Tag transitions with `addTransitionType` so VTs can pick different animations based on context. Call it multiple times to stack types — different VTs in the tree react to different types:
 
 ```jsx
 startTransition(() => {
@@ -142,7 +133,7 @@ startTransition(() => {
 });
 ```
 
-Pass an object to map types to CSS classes. This works on `enter`, `exit`, **and** `share`:
+Pass an object to map types to CSS classes. Works on `enter`, `exit`, **and** `share`:
 
 ```jsx
 <ViewTransition
@@ -159,7 +150,7 @@ Pass an object to map types to CSS classes. This works on `enter`, `exit`, **and
 
 ### `router.back()` and Browser Back Button
 
-`router.back()` does **not** trigger view transitions — the browser's `popstate` event is synchronous and incompatible with `document.startViewTransition`. Use `router.push()` with an explicit URL instead. The browser's native back/forward buttons also skip animations (a browser/router limitation, not fixable in app code).
+`router.back()` and the browser's back/forward buttons do **not** trigger view transitions (`popstate` is synchronous, incompatible with `startViewTransition`). Use `router.push()` with an explicit URL instead.
 
 ### Types and Suspense
 
