@@ -153,12 +153,23 @@ startTransition(() => {
 });
 ```
 
-Map types to CSS classes:
+You can call `addTransitionType` multiple times in one transition to stack types. Different VTs in the tree can react to different types:
+
+```jsx
+startTransition(() => {
+  addTransitionType('nav-forward');
+  addTransitionType('select-item');
+  router.push('/detail/1');
+});
+```
+
+Map types to CSS classes. This works on `enter`, `exit`, **and** `share`:
 
 ```jsx
 <ViewTransition
   enter={{ 'nav-forward': 'slide-from-right', 'nav-back': 'slide-from-left', default: 'none' }}
   exit={{ 'nav-forward': 'slide-to-left', 'nav-back': 'slide-to-right', default: 'none' }}
+  share={{ 'nav-forward': 'morph-forward', 'nav-back': 'morph-back', default: 'morph' }}
   default="none"
 >
   <Page />
