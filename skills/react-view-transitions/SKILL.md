@@ -15,6 +15,8 @@ Animate between UI states using the browser's native `document.startViewTransiti
 
 Every `<ViewTransition>` should communicate a spatial relationship or continuity. If you can't articulate what it communicates, don't add it.
 
+Implement **all** applicable patterns from this list, in this order:
+
 | Priority | Pattern | What it communicates |
 |----------|---------|---------------------|
 | 1 | **Shared element** (`name`) | "Same thing — going deeper" |
@@ -23,7 +25,7 @@ Every `<ViewTransition>` should communicate a spatial relationship or continuity
 | 4 | **State change** (`enter`/`exit`) | "Something appeared/disappeared" |
 | 5 | **Route change** (layout-level) | "Going to a new place" |
 
-Prefer #1–#4 over ambient route transitions. Only one tree level should animate at a time — adding a layout-level transition on top of per-page animations produces competing double-animation.
+This is an implementation order, not a "pick one" list. Most apps need #1–#3 at minimum. Only skip a pattern if the app has no use case for it. Only one tree level should animate at a time — adding a layout-level transition on top of per-page animations produces competing double-animation.
 
 ### Choosing Animation Style
 
@@ -47,7 +49,7 @@ Reserve directional slides for hierarchical navigation only. Directional slides 
 
 ## Implementation Workflow
 
-When adding view transitions to an existing app, follow the step-by-step guide in `references/implementation.md`.
+When adding view transitions to an existing app, **follow `references/implementation.md` step by step.** Start with the audit — do not skip it. Copy the CSS recipes from `references/css-recipes.md` into the global stylesheet — do not write your own animation CSS.
 
 ---
 
