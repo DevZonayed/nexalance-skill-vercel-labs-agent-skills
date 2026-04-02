@@ -14,7 +14,7 @@ module.exports = nextConfig;
 
 This wraps every `<Link>` navigation in `document.startViewTransition`. Any VT with `default="auto"` fires on **every** link click — use `default="none"` to prevent competing animations.
 
-The Next.js App Router internally uses React canary, so `ViewTransition` works without manually installing `react@canary`. `npm ls react` may show a stable-looking version — this is expected. Only run `npm install react@canary react-dom@canary` for standalone React projects (without Next.js).
+Do **not** install `react@canary` — the App Router already bundles React canary internally. `ViewTransition` works out of the box. `npm ls react` may show a stable-looking version; this is expected.
 
 ---
 

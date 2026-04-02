@@ -42,7 +42,8 @@ Reserve directional slides for hierarchical navigation only. Directional slides 
 
 ## Availability
 
-- `ViewTransition` is in `react@canary` / `react@experimental` — not in stable React. However, **Next.js App Router internally uses React canary**, so `ViewTransition` works in Next.js without manually installing canary. `npm ls react` may show a stable-looking version — this is expected; do **not** reinstall or downgrade React based on that output.
+- **Next.js:** Do **not** install `react@canary` — the App Router already bundles React canary internally. `ViewTransition` works out of the box. `npm ls react` may show a stable-looking version; this is expected.
+- **Without Next.js:** Install `react@canary react-dom@canary` (`ViewTransition` is not in stable React).
 - Browser support: Chromium 111+, Firefox 144+, Safari 18.2+. Graceful degradation on unsupported browsers.
 
 ---
