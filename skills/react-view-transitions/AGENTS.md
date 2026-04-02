@@ -788,11 +788,11 @@ Ready-to-use CSS for `<ViewTransition>` props. Copy into global stylesheet.
 }
 ```
 
-**Warning:** `morph` is designed for images. For text elements with significant size differences (e.g., `<h3>` → `<h1>`), the raster snapshot gets scaled, producing a visible ghost artifact. Use `text-morph` instead.
+**Note:** Shared element transitions take raster snapshots. For text with significant size differences (e.g., `<h3>` → `<h1>`), the old snapshot gets scaled up, producing a visible ghost artifact. Use `text-morph` for text shared elements.
 
 ## Text Morph
 
-Avoids scaling artifacts on text by hiding the old snapshot and showing the new text at full resolution:
+Avoids raster scaling artifacts on text by hiding the old snapshot and showing the new text at full resolution:
 
 ```css
 ::view-transition-group(.text-morph) {
