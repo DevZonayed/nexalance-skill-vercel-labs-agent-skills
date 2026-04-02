@@ -32,7 +32,7 @@ When following `implementation.md`, apply these additions:
 
 ## Layout-Level ViewTransition
 
-**Do NOT add a layout-level VT wrapping `{children}` if pages have their own VTs.** Remove the layout VT entirely — the interaction with nested page VTs is not well-defined.
+**Do NOT add a layout-level VT wrapping `{children}` if pages have their own VTs.** Nested VTs never fire enter/exit when inside a parent VT — page-level enter/exit will silently not work. Remove the layout VT entirely.
 
 A bare `<ViewTransition>` in layout works only if pages have **no** VTs of their own.
 

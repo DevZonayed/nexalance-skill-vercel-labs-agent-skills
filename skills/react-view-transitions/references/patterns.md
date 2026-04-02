@@ -245,7 +245,7 @@ The `types` array (second argument) lets you vary animation based on transition 
 
 **Only updates animate (no enter/exit):** Without `<Suspense>`, React treats swaps as updates. Conditionally render the VT itself, or wrap in `<Suspense>`.
 
-**Layout VT interferes with page VTs:** Don't add a layout-level VT wrapping `{children}` if pages have their own VTs. Remove the layout VT instead.
+**Layout VT prevents page VTs from animating:** Nested VTs never fire enter/exit inside a parent VT. If your layout has a VT wrapping `{children}`, page-level enter/exit will silently not work. Remove the layout VT.
 
 **List reorder not animating with `useOptimistic`:** Optimistic values resolve before snapshot. Use committed state for list order.
 

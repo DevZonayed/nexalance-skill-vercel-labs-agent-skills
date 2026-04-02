@@ -625,7 +625,7 @@ Imperative control via `onEnter`, `onExit`, `onUpdate`, `onShare`. Always return
 
 **Only updates animate:** Without `<Suspense>`, React treats swaps as updates. Conditionally render the VT itself, or wrap in `<Suspense>`.
 
-**Layout VT interferes with page VTs:** Don't add a layout-level VT wrapping `{children}` if pages have their own VTs. Remove the layout VT instead.
+**Layout VT prevents page VTs from animating:** Nested VTs never fire enter/exit inside a parent VT. If your layout has a VT wrapping `{children}`, page-level enter/exit will silently not work. Remove the layout VT.
 
 **TS error "Property 'default' is missing":** Type-keyed objects require a `default` key.
 
@@ -847,7 +847,7 @@ Wraps every `<Link>` navigation in `document.startViewTransition`. Use `default=
 
 ## Layout-Level ViewTransition
 
-Don't add a layout-level VT wrapping `{children}` if pages have their own VTs — remove it. The interaction with nested page VTs is not well-defined. A bare VT in layout works only if pages have no VTs of their own. Layouts persist across navigations — `enter`/`exit` only fire on initial mount. Don't use type-keyed maps in layouts.
+Don't add a layout-level VT wrapping `{children}` if pages have their own VTs — nested VTs never fire enter/exit inside a parent VT, so page-level enter/exit will silently not work. Remove the layout VT entirely. A bare VT in layout works only if pages have no VTs of their own. Layouts persist across navigations — don't use type-keyed maps in layouts.
 
 ## The `transitionTypes` Prop
 
