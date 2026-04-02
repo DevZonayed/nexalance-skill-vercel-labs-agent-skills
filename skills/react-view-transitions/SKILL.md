@@ -25,7 +25,7 @@ Implement **all** applicable patterns from this list, in this order:
 | 4 | **State change** (`enter`/`exit`) | "Something appeared/disappeared" |
 | 5 | **Route change** (layout-level) | "Going to a new place" |
 
-This is an implementation order, not a "pick one" list. Most apps need #1–#3 at minimum. Only skip a pattern if the app has no use case for it. Only one tree level should animate at a time — adding a layout-level transition on top of per-page animations produces competing double-animation.
+This is an implementation order, not a "pick one" list. Implement every pattern that fits the app. Only skip a pattern if the app has no use case for it.
 
 ### Choosing Animation Style
 
@@ -36,7 +36,7 @@ This is an implementation order, not a "pick one" list. Most apps need #1–#3 a
 | Suspense reveal | `enter`/`exit` string props | Content arriving |
 | Revalidation / background refresh | `default="none"` | Silent — no animation needed |
 
-Reserve directional slides for hierarchical navigation only. Directional slides on sibling links falsely imply spatial depth.
+Reserve directional slides for hierarchical navigation (list → detail) and ordered sequences (prev/next photo, carousel, paginated results). For ordered sequences, the direction communicates position: "next" slides from right, "previous" from left. Lateral/unordered navigation (tab-to-tab) should not use directional slides — it falsely implies spatial depth.
 
 ---
 
@@ -145,6 +145,16 @@ Pass an object to map types to CSS classes. Works on `enter`, `exit`, **and** `s
 >
   <Page />
 </ViewTransition>
+```
+
+`enter` and `exit` don't have to be symmetric. For example, fade in but slide out directionally:
+
+```jsx
+<ViewTransition
+  enter={{ 'nav-forward': 'fade-in', 'nav-back': 'fade-in', default: 'none' }}
+  exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+  default="none"
+>
 ```
 
 **TypeScript:** `ViewTransitionClassPerType` requires a `default` key in the object.

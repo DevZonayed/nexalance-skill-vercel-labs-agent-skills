@@ -20,7 +20,7 @@ Then classify every navigation and produce a navigation map:
 |-----------------|----------------------|--------------|-----------------------|
 | /               | /detail/[id]         | forward      | directional slide     |
 | /detail/[id]    | /                    | back         | directional slide     |
-| /detail/[id]    | /detail/[other]      | lateral      | key+share crossfade   |
+| /detail/[id]    | /detail/[other]      | sequential   | directional slide (ordered prev/next) or key+share crossfade |
 | /tab/[a]        | /tab/[b]             | lateral      | key+share crossfade   |
 | (Suspense)      | (content loads)      | —            | slide-up reveal       |
 ```
@@ -82,7 +82,7 @@ The `nav-forward` and `nav-back` CSS classes from `css-recipes.md` produce horiz
 - Always pair `enter` with `exit` — without an exit animation, the old page disappears instantly while the new one animates in.
 - Always include `default: "none"` in type map objects and `default="none"` on the component — otherwise it fires on every transition.
 - Place the directional `<ViewTransition>` in each page component, not in a layout. Layouts persist across navigations and never trigger enter/exit.
-- Only use directional slides for hierarchical navigation. Lateral/sibling navigation (tab-to-tab) should use a bare `<ViewTransition>` (cross-fade) or `default="none"`.
+- Only use directional slides for hierarchical navigation or ordered sequences (prev/next). Lateral/sibling navigation (tab-to-tab) should use a bare `<ViewTransition>` (cross-fade) or `default="none"`.
 
 ## Step 5: Add Suspense Reveals
 
@@ -126,21 +126,7 @@ For every shared visual element identified in Step 1, add matching named `<ViewT
 
 The `share="morph"` class uses the morph recipe from `css-recipes.md` (controlled duration + motion blur). For a simpler cross-fade, use `share="auto"` (browser default).
 
-When list items contain shared elements, compose both patterns — these are two independent `<ViewTransition>` layers:
-
-```jsx
-{items.map(item => (
-  <ViewTransition key={item.id}>                                        {/* list identity */}
-    <Link href={`/detail/${item.id}`}>
-      <ViewTransition name={`item-${item.id}`} share="morph" default="none">  {/* shared element */}
-        <Image src={item.image} ... />
-      </ViewTransition>
-    </Link>
-  </ViewTransition>
-))}
-```
-
-The outer VT handles list reorder/enter animations. The inner VT handles the cross-route shared element morph. Missing either layer means that animation silently doesn't happen.
+When list items contain shared elements, compose both patterns with two nested `<ViewTransition>` layers — see "Composing Shared Elements with List Identity" in `SKILL.md`.
 
 **Rules:**
 - Names must be globally unique — use prefixes like `photo-${id}`.
