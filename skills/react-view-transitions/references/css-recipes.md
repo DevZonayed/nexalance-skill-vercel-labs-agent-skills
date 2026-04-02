@@ -156,6 +156,28 @@ Usage:
 
 Usage: `<ViewTransition name={`product-${id}`} share="morph" />`
 
+**Warning:** `morph` is designed for images. For text elements with significant size differences (e.g., `<h3>` → `<h1>`), the raster snapshot gets scaled, producing a visible ghost artifact. Use `text-morph` instead.
+
+## Text Morph
+
+Avoids scaling artifacts on text by hiding the old snapshot and showing the new text at full resolution immediately:
+
+```css
+::view-transition-group(.text-morph) {
+  animation-duration: var(--duration-move);
+}
+::view-transition-old(.text-morph) {
+  display: none;
+}
+::view-transition-new(.text-morph) {
+  animation: none;
+  object-fit: none;
+  object-position: left top;
+}
+```
+
+Usage: `<ViewTransition name={`title-${id}`} share="text-morph" />`
+
 ---
 
 ## Scale

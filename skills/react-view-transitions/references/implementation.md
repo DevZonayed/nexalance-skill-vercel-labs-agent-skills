@@ -78,6 +78,24 @@ Then wrap each **page component** (not layout) in a type-keyed `<ViewTransition>
 
 The `nav-forward` and `nav-back` CSS classes from `css-recipes.md` produce horizontal slides. For simpler apps where directional motion isn't needed, a bare `<ViewTransition default="none">` wrapper with `enter="fade-in"` / `exit="fade-out"` works too.
 
+Extract this into a reusable component so every page doesn't repeat the verbose type map:
+
+```jsx
+export function DirectionalTransition({ children }: { children: React.ReactNode }) {
+  return (
+    <ViewTransition
+      enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      default="none"
+    >
+      {children}
+    </ViewTransition>
+  );
+}
+```
+
+This also becomes the single place to adjust if you add new transition types later.
+
 **Rules:**
 - Always pair `enter` with `exit` — without an exit animation, the old page disappears instantly while the new one animates in.
 - Always include `default: "none"` in type map objects and `default="none"` on the component — otherwise it fires on every transition.

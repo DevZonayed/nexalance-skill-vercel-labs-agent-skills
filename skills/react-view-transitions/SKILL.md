@@ -159,6 +159,22 @@ Pass an object to map types to CSS classes. Works on `enter`, `exit`, **and** `s
 
 **TypeScript:** `ViewTransitionClassPerType` requires a `default` key in the object.
 
+For apps with multiple pages, extract the type-keyed VT into a reusable wrapper:
+
+```jsx
+export function DirectionalTransition({ children }: { children: React.ReactNode }) {
+  return (
+    <ViewTransition
+      enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      default="none"
+    >
+      {children}
+    </ViewTransition>
+  );
+}
+```
+
 ### `router.back()` and Browser Back Button
 
 `router.back()` and the browser's back/forward buttons do **not** trigger view transitions (`popstate` is synchronous, incompatible with `startViewTransition`). Use `router.push()` with an explicit URL instead.

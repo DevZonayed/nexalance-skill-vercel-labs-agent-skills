@@ -391,6 +391,22 @@ Wrap each **page component** (not layout) in a type-keyed VT:
 </ViewTransition>
 ```
 
+Extract into a reusable component so every page doesn't repeat the type map:
+
+```jsx
+export function DirectionalTransition({ children }: { children: React.ReactNode }) {
+  return (
+    <ViewTransition
+      enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', default: 'none' }}
+      default="none"
+    >
+      {children}
+    </ViewTransition>
+  );
+}
+```
+
 **Rules:** Always pair `enter` with `exit`. Always include `default: "none"`. Place in page components, not layouts. Only use directional slides for hierarchical navigation or ordered sequences (prev/next).
 
 ## Step 5: Add Suspense Reveals
@@ -769,6 +785,26 @@ Ready-to-use CSS for `<ViewTransition>` props. Copy into global stylesheet.
 }
 @keyframes via-blur {
   30% { filter: blur(3px); }
+}
+```
+
+**Warning:** `morph` is designed for images. For text elements with significant size differences (e.g., `<h3>` → `<h1>`), the raster snapshot gets scaled, producing a visible ghost artifact. Use `text-morph` instead.
+
+## Text Morph
+
+Avoids scaling artifacts on text by hiding the old snapshot and showing the new text at full resolution:
+
+```css
+::view-transition-group(.text-morph) {
+  animation-duration: var(--duration-move);
+}
+::view-transition-old(.text-morph) {
+  display: none;
+}
+::view-transition-new(.text-morph) {
+  animation: none;
+  object-fit: none;
+  object-position: left top;
 }
 ```
 
