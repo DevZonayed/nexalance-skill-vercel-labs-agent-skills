@@ -622,12 +622,7 @@ const Page = await PAGE_MODULES[pageName]()
 **Incorrect: a 2-value enum still hides the final path from static analysis**
 
 ```ts
-const CONTENT_DIRS = {
-  blog: 'content/blog',
-  docs: 'content/docs',
-} as const
-
-const baseDir = path.join(process.cwd(), CONTENT_DIRS[contentKind])
+const baseDir = path.join(process.cwd(), 'content/' + contentKind)
 ```
 
 **Correct: make each final path literal at the callsite**
