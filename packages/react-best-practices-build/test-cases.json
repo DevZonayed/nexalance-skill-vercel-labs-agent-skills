@@ -179,7 +179,7 @@
     "ruleId": "",
     "ruleTitle": "Prefer Statically Analyzable Paths",
     "type": "bad",
-    "code": "const CONTENT_DIRS = {\n  blog: 'content/blog',\n  docs: 'content/docs',\n} as const\n\nconst baseDir = path.join(process.cwd(), CONTENT_DIRS[contentKind])",
+    "code": "const baseDir = path.join(process.cwd(), 'content/' + contentKind)",
     "language": "ts",
     "description": "a 2-value enum still hides the final path from static analysis"
   },
