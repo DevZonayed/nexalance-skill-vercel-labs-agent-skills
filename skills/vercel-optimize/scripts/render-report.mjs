@@ -188,6 +188,8 @@ async function main() {
     const messageArtifact = buildFinalReportMessage({
       reportPath: args.outPath ?? '(stdout)',
       markdown: md,
+      recommendations,
+      signals: signalsRaw,
     });
     const serializedMessage = JSON.stringify(messageArtifact, null, 2) + '\n';
     await mkdir(dirname(args.messageOutPath), { recursive: true });

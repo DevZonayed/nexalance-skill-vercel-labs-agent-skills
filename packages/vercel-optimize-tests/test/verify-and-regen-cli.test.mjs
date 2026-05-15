@@ -132,7 +132,7 @@ test('verify-and-regen CLI: applies sanitizers before grading customer-facing re
     await Promise.all([
       writeFile(recsPath, JSON.stringify([rec]), 'utf-8'),
       writeFile(signalsPath, JSON.stringify({
-        stack: { framework: 'next', frameworkVersion: '16.3.0-canary.11', cacheComponents: true },
+        stack: { framework: 'next', frameworkVersion: '16.3.0-canary.11', cacheComponents: false },
         codebase: { findings: [] },
         project: { defaultResourceConfig: {} },
       }), 'utf-8'),

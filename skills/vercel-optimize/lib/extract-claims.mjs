@@ -115,6 +115,17 @@ export function extractClaims(rec, ctx = {}) {
     });
   }
 
+  if (mentionsRuntimeCacheWhenCacheComponents(rec)) {
+    claims.push({
+      type: 'next_cache_components_runtime_cache_preference',
+      rec,
+      framework,
+      frameworkVersion,
+      cacheComponents,
+      sourceField: 'next-cache-components-runtime-cache-preference',
+    });
+  }
+
   if (mentionsMultipleCacheLifeCalls(rec)) {
     claims.push({
       type: 'next_cache_life_single_execution',
@@ -256,6 +267,18 @@ export function extractClaims(rec, ctx = {}) {
     });
   }
 
+  if (mentionsTurboBuildCacheRecommendation(rec)) {
+    claims.push({
+      type: 'turbo_build_cache_safety',
+      rec,
+      files: recommendationFiles(rec),
+      repoRoot,
+      projectRootDirectory,
+      framework,
+      sourceField: 'turbo-build-cache-safety',
+    });
+  }
+
   for (const c of asArray(rec.verifiableClaims)) {
     if (c && typeof c === 'object' && typeof c.type === 'string') {
       claims.push({
@@ -319,6 +342,13 @@ function mentionsNext16RuntimeCacheApiMismatch(rec) {
   const citations = asArray(rec?.citations).join('\n');
   return /\bunstable_cache\b/.test(haystack) &&
     (/\bRuntime Cache\b/i.test(haystack) || /vercel\.com\/docs\/caching\/runtime-cache/i.test(citations));
+}
+
+function mentionsRuntimeCacheWhenCacheComponents(rec) {
+  const haystack = recText(rec);
+  const citations = asArray(rec?.citations).join('\n');
+  return /\b(?:Runtime Cache|@vercel\/functions|getCache\s*\(|setCache\s*\()\b/i.test(haystack) ||
+    /vercel\.com\/docs\/caching\/runtime-cache/i.test(citations);
 }
 
 function mentionsMultipleCacheLifeCalls(rec) {
@@ -443,6 +473,13 @@ function mentionsIgnoredBuildStepRecommendation(rec) {
   const haystack = recText(rec);
   return /\b(?:Ignored Build Step|ignoreCommand|turbo-ignore|skip unaffected|unaffected projects?)\b/i.test(haystack) &&
     /\b(?:add|set|configure|enable|use|introduce|wire|adopt|turn on)\b[^.\n]{0,180}\b(?:Ignored Build Step|ignoreCommand|turbo-ignore|skip unaffected|unaffected projects?)\b/i.test(haystack);
+}
+
+function mentionsTurboBuildCacheRecommendation(rec) {
+  const haystack = recText(rec);
+  if (!/\b(?:Turbo|Turborepo|turbo\.json|tasks\.build|build cache|build caching)\b/i.test(haystack)) return false;
+  return /\b(?:enable|re-enable|restore|turn on|set|remove)\b[^.\n]{0,220}\b(?:cache\s*:\s*false|tasks\.build\.cache|build cache|build caching|Turbo cache|Turborepo cache)\b/i.test(haystack) ||
+    /\b(?:cache\s*:\s*false|tasks\.build\.cache|build cache|build caching|Turbo cache|Turborepo cache)\b[^.\n]{0,220}\b(?:enable|re-enable|restore|turn on|set|remove)\b/i.test(haystack);
 }
 
 function recText(rec) {

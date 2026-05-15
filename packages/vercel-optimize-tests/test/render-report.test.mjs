@@ -412,12 +412,21 @@ test('buildFinalReportMessage: extracts concise public message from rendered mar
     signals: baseSignals,
     opts: { projectName: 'x', generatedAt: null },
   });
-  const message = buildFinalReportMessage({ reportPath: '/tmp/report.md', markdown: md });
+  const message = buildFinalReportMessage({
+    reportPath: '/tmp/report.md',
+    markdown: md,
+    recommendations: [sampleRec],
+    signals: baseSignals,
+  });
   assert.match(message.body, /^Report written: \/tmp\/report\.md/);
   assert.match(message.body, /\*\*Coverage\*\*: \*\*1\*\* metric signal met the investigation threshold/);
+  assert.match(message.body, /Ready recommendations:/);
+  assert.match(message.body, /1\. Parallelize three sequential fetch waves in \/dashboard\/\[sessionId\]/);
+  assert.match(message.body, /Impact: Reduce \/dashboard\/\[sessionId\] 95th percentile from 1066ms toward ~400-600ms/);
   assert.doesNotMatch(message.body, /details|passRate|\bquality\b|sanitizer|sub[- ]agent|abstention|debug/i);
   assert.equal(message.lineCount, message.body.split('\n').length);
   assert.equal(message.reportPath, '/tmp/report.md');
+  assert.equal(message.recommendationsShown, 1);
 });
 
 test('buildFinalReportMessage: does not invent counts without a Coverage line', () => {
@@ -471,7 +480,10 @@ test('render-report CLI: --message-out writes concise final message separate fro
     assertNoPublicInternals(message.body);
     assert.match(message.body, /^Report written:/);
     assert.match(message.body, /\*\*Coverage\*\*:/);
+    assert.match(message.body, /Ready recommendations:/);
+    assert.match(message.body, /Parallelize three sequential fetch waves/);
     assert.doesNotMatch(message.body, /Developer diagnostics|debug\.json|passRate|\bquality\b|sanitizer/i);
+    assert.equal(message.recommendationsShown, 1);
     assert.equal(debug.recommendations[0].passRate, 0.8);
     assert.deepEqual(debug.recommendations[0].sanitizerTrail, ['$-strip:2']);
   } finally {

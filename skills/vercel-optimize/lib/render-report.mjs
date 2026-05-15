@@ -198,7 +198,7 @@ function assertValidObservations(observations) {
   }
 }
 
-export function buildFinalReportMessage({ reportPath, markdown } = {}) {
+export function buildFinalReportMessage({ reportPath, markdown, recommendations = [], signals = {}, maxRecommendations = 10 } = {}) {
   const destination = reportPath || 'report.md';
   const coverageLine = extractCoverageLine(markdown);
   const lines = [`Report written: ${destination}`];
@@ -209,6 +209,11 @@ export function buildFinalReportMessage({ reportPath, markdown } = {}) {
     lines.push('');
     lines.push('Open the report for the full results. No coverage line was available to summarize.');
   }
+  const readyPreview = renderFinalRecommendationPreview(recommendations, signals, maxRecommendations);
+  if (readyPreview.length > 0) {
+    lines.push('');
+    lines.push(...readyPreview);
+  }
   const body = lines.join('\n');
   return {
     body,
@@ -216,7 +221,38 @@ export function buildFinalReportMessage({ reportPath, markdown } = {}) {
     sha256: createHash('sha256').update(body).digest('hex'),
     reportPath: destination,
     coverageLine: coverageLine ?? null,
+    recommendationsShown: readyPreview.filter((line) => /^\d+\./.test(line)).length,
   };
+}
+
+function renderFinalRecommendationPreview(recommendations, signals, maxRecommendations) {
+  const ready = Array.isArray(recommendations)
+    ? sortRecs(recommendations.filter((r) => r && r.abstain !== true))
+    : [];
+  if (ready.length === 0) return [];
+  const max = Math.max(1, Math.min(Number.isInteger(maxRecommendations) ? maxRecommendations : 5, 10));
+  const shown = ready.slice(0, max);
+  const lines = ['Ready recommendations:'];
+  for (const [i, rec] of shown.entries()) {
+    lines.push(`${i + 1}. ${compactFinalText(rec.what ?? displayCandidate(rec))}`);
+    const impact = impactString(rec, signals);
+    if (impact && !/^_\(no impact framing recorded\)_$/.test(impact)) {
+      lines.push(`   Impact: ${compactFinalText(impact)}`);
+    }
+  }
+  const hidden = ready.length - shown.length;
+  if (hidden > 0) {
+    lines.push(`Open the report for ${hidden} more ready recommendation${hidden === 1 ? '' : 's'} and the full evidence.`);
+  }
+  return lines;
+}
+
+function compactFinalText(value) {
+  const text = formatRecommendationText(String(value ?? ''))
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= 220) return text;
+  return `${text.slice(0, 217).trimEnd()}...`;
 }
 
 function extractCoverageLine(markdown) {

@@ -750,6 +750,84 @@ test('extractClaims + verifyClaim: Ignored Build Step recs respect project skip-
   assert.equal(supported.disposition, 'verified');
 });
 
+test('extractClaims + verifyClaim: Cache Components projects prefer use cache remote over Runtime Cache APIs', async () => {
+  const rec = {
+    candidateRef: 'uncached_route:/docs/md/[...slug]',
+    what: 'Cache the generated markdown with Runtime Cache.',
+    fix: "import { getCache } from '@vercel/functions';\nconst cache = getCache();",
+    citations: ['https://vercel.com/docs/caching/runtime-cache'],
+  };
+  const claim = extractClaims(rec, {
+    framework: 'next',
+    version: '16.3.0',
+    cacheComponents: true,
+  }).find((c) => c.type === 'next_cache_components_runtime_cache_preference');
+  assert.ok(claim);
+  const failed = await verifyClaim(claim);
+  assert.equal(failed.disposition, 'failed');
+  assert.match(failed.reason, /use cache: remote/);
+
+  const supported = await verifyClaim({
+    ...claim,
+    rec: {
+      ...rec,
+      fix: "Extract the work into a helper with `'use cache: remote'`, then call it from the route handler.",
+    },
+  });
+  assert.equal(supported.disposition, 'verified');
+});
+
+test('extractClaims + verifyClaim: Turbo build-cache recs reject side-effectful builds and bad outputs', async () => {
+  const repoRoot = await mkdtemp(join(tmpdir(), 'vo-turbo-cache-'));
+  await mkdir(join(repoRoot, 'apps/site'), { recursive: true });
+  await Promise.all([
+    writeFile(join(repoRoot, 'apps/site/package.json'), JSON.stringify({
+      scripts: { build: 'payload migrate && pnpm buildonly' },
+      dependencies: { next: '16.3.0' },
+    }), 'utf-8'),
+    writeFile(join(repoRoot, 'apps/site/turbo.json'), JSON.stringify({
+      tasks: { build: { cache: false, outputs: ['dist/**'] } },
+    }), 'utf-8'),
+  ]);
+
+  const rec = {
+    candidateRef: 'build_minutes_fanout:<account>',
+    what: 'Re-enable Turbo build caching.',
+    fix: 'Set `tasks.build.cache` to `true` in `turbo.json`.',
+    affectedFiles: ['apps/site/turbo.json'],
+  };
+  const claim = extractClaims(rec, {
+    repoRoot,
+    framework: 'next',
+  }).find((c) => c.type === 'turbo_build_cache_safety');
+  assert.ok(claim);
+  const sideEffectFailure = await verifyClaim(claim);
+  assert.equal(sideEffectFailure.disposition, 'failed');
+  assert.match(sideEffectFailure.reason, /migrations|side effects/);
+
+  const separatedButBadOutputs = await verifyClaim({
+    ...claim,
+    rec: {
+      ...rec,
+      fix: 'Split `payload migrate` into an uncached prebuild task, then enable caching for the pure build.',
+    },
+  });
+  assert.equal(separatedButBadOutputs.disposition, 'failed');
+  assert.match(separatedButBadOutputs.reason, /\.next/);
+
+  await writeFile(join(repoRoot, 'apps/site/turbo.json'), JSON.stringify({
+    tasks: { build: { cache: false, outputs: ['.next/**', '!.next/cache/**'] } },
+  }), 'utf-8');
+  const supported = await verifyClaim({
+    ...claim,
+    rec: {
+      ...rec,
+      fix: 'Split `payload migrate` into an uncached prebuild task, then enable caching for the pure build.',
+    },
+  });
+  assert.equal(supported.disposition, 'verified');
+});
+
 test('extractClaims + verifyClaim: cache header recs must acknowledge error-dominated routes', async () => {
   const rec = {
     candidateRef: 'uncached_route:/docs/llm-digest/[...slug]',

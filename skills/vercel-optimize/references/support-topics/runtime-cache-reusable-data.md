@@ -16,7 +16,7 @@ Runtime Cache is only useful when the same server-side result is reused across r
 Use p75/p95 latency, call count, caller routes, and transfer bytes. In source, identify database queries, external API calls, or expensive computations that return the same result for many viewers.
 
 ## Do Not Recommend When
-Do not cache per-user data, mutations, secrets, one-off requests, or data with an unknown freshness contract. Do not add Runtime Cache when CDN caching already solves the route.
+Skip per-user data, mutations, secrets, one-off requests, or unknown freshness. Skip Runtime Cache when CDN caching solves the route. For Next with Cache Components, check `use cache: remote` first; use Runtime Cache only as a justified fallback.
 
 ## Verification
 Name the reusable data, observed route or hostname pressure, required freshness window, and the exact call site to wrap.

@@ -2,7 +2,7 @@
 
 import { readFile, access, readdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { isAbsolute, join, normalize } from 'node:path';
+import { dirname, isAbsolute, join, normalize } from 'node:path';
 import { promisify } from 'node:util';
 import { isKnownUrl, sanitizeCitations } from './citations.mjs';
 import { findRecContradictions } from './project-facts.mjs';
@@ -29,6 +29,7 @@ export async function verifyClaim(claim) {
     case 'next_cached_not_found_causal_support': return verifyNextCachedNotFoundCausalSupport(claim);
     case 'next_stable_cache_api_for_version': return verifyNextStableCacheApiForVersion(claim);
     case 'next_runtime_cache_api_for_version': return verifyNextRuntimeCacheApiForVersion(claim);
+    case 'next_cache_components_runtime_cache_preference': return verifyNextCacheComponentsRuntimeCachePreference(claim);
     case 'next_cache_life_single_execution': return verifyNextCacheLifeSingleExecution(claim);
     case 'next_cache_lifetime_freshness_supported': return verifyNextCacheLifetimeFreshnessSupported(claim);
     case 'next_cache_components_route_chain_file': return verifyNextCacheComponentsRouteChainFile(claim);
@@ -48,6 +49,7 @@ export async function verifyClaim(claim) {
     case 'parallelization_not_cpu_bound_work': return verifyParallelizationNotCpuBoundWork(claim);
     case 'runtime_error_cause_supported': return verifyRuntimeErrorCauseSupported(claim);
     case 'vercel_ignore_command_project_state': return verifyVercelIgnoreCommandProjectState(claim);
+    case 'turbo_build_cache_safety': return verifyTurboBuildCacheSafety(claim);
     case 'does_not_contradict_project_config': return verifyNoProjectConfigContradiction(claim);
     default:
       return { disposition: 'unverifiable', reason: `unknown claim type: ${claim.type}` };
@@ -277,6 +279,25 @@ async function verifyNextRuntimeCacheApiForVersion({ rec, framework, frameworkVe
     };
   }
   return { disposition: 'verified', reason: 'Next.js Runtime Cache API usage matches project version' };
+}
+
+async function verifyNextCacheComponentsRuntimeCachePreference({ rec, framework, cacheComponents }) {
+  if (!rec) return { disposition: 'unsupported', reason: 'next_cache_components_runtime_cache_preference requires rec' };
+  if (framework !== 'next') return { disposition: 'verified', reason: 'not a Next.js project' };
+  if (cacheComponents !== true) {
+    return { disposition: 'verified', reason: 'Cache Components not detected as enabled' };
+  }
+  const text = recText(rec);
+  if (/\buse cache:\s*remote\b/i.test(text)) {
+    return { disposition: 'verified', reason: 'recommendation uses framework-native remote cache for Cache Components project' };
+  }
+  if (/\b(?:fallback|only if|when Cache Components (?:is|are) unavailable|if cacheComponents is false)\b[^.\n]{0,180}\b(?:Runtime Cache|@vercel\/functions|getCache\s*\()/i.test(text)) {
+    return { disposition: 'verified', reason: 'Runtime Cache is framed as a fallback, not the primary Cache Components path' };
+  }
+  return {
+    disposition: 'failed',
+    reason: 'Next.js Cache Components is enabled; prefer `use cache: remote` before recommending lower-level Runtime Cache APIs',
+  };
 }
 
 async function verifyNextCacheLifeSingleExecution({ rec, framework, frameworkVersion }) {
@@ -560,7 +581,10 @@ async function verifyCache404LongTtlSafety({ rec }) {
       reason: 'long shared caching for 404/not-found branches needs explicit freshness evidence; leave those branches uncached or short-lived',
     };
   }
-  return { disposition: 'verified', reason: 'no long-lived 404/not-found caching detected' };
+  return {
+    disposition: 'failed',
+    reason: 'cache recommendation mentions a 404/not-found branch without explicitly keeping that branch uncached or short-lived',
+  };
 }
 
 async function verifyRouteErrorNotFoundStatusAndScope({ rec }) {
@@ -704,6 +728,79 @@ async function verifyVercelIgnoreCommandProjectState({ rec, signals }) {
     };
   }
   return { disposition: 'verified', reason: 'project config does not contradict Ignored Build Step recommendation' };
+}
+
+async function verifyTurboBuildCacheSafety({ rec, files, repoRoot = '.', projectRootDirectory = null, framework }) {
+  if (!rec) return { disposition: 'unsupported', reason: 'turbo_build_cache_safety requires rec' };
+  const candidateFiles = Array.isArray(files) ? files : [];
+  const turboFiles = candidateFiles.filter((file) => /(^|\/)turbo\.json$/.test(String(file)));
+  if (turboFiles.length === 0) {
+    return { disposition: 'unverifiable', reason: 'Turbo build-cache recommendation has no turbo.json file to inspect' };
+  }
+
+  const text = recText(rec);
+  for (const turboFile of turboFiles) {
+    let turbo;
+    try {
+      const { content } = await readClaimFile({ file: turboFile, repoRoot, projectRootDirectory });
+      turbo = parseJsonLike(content);
+    } catch {
+      return { disposition: 'unverifiable', reason: `cannot parse ${turboFile} for Turbo cache safety` };
+    }
+    const buildTask = turbo?.tasks?.build ?? turbo?.pipeline?.build ?? null;
+    const outputs = Array.isArray(buildTask?.outputs) ? buildTask.outputs.map(String) : [];
+    const pkgFile = siblingPackageJson(turboFile);
+    const pkg = await readOptionalJsonFile({ file: pkgFile, repoRoot, projectRootDirectory });
+    const buildScript = typeof pkg?.scripts?.build === 'string' ? pkg.scripts.build : '';
+    const hasNext = framework === 'next' || Boolean(pkg?.dependencies?.next || pkg?.devDependencies?.next);
+
+    if (buildScriptHasMigrationSideEffect(buildScript) && !recSeparatesTurboBuildSideEffects(text)) {
+      return {
+        disposition: 'failed',
+        reason: 'Turbo build caching is unsafe for this build task because the package build script runs migrations or other side effects; split those steps before caching the build output',
+      };
+    }
+
+    if (hasNext && outputs.length > 0 && !outputs.some((output) => /\.next(?:\/|\*\*)/.test(output))) {
+      return {
+        disposition: 'failed',
+        reason: 'Turbo build cache outputs do not include Next.js build output (`.next/**`); fix the output contract before enabling build caching',
+      };
+    }
+  }
+
+  return { disposition: 'verified', reason: 'Turbo build cache recommendation does not conflict with local build scripts or outputs' };
+}
+
+function siblingPackageJson(file) {
+  return join(dirname(String(file)), 'package.json');
+}
+
+async function readOptionalJsonFile(claim) {
+  try {
+    const { content } = await readClaimFile(claim);
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+function parseJsonLike(content) {
+  return JSON.parse(
+    String(content)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1')
+      .replace(/,\s*([}\]])/g, '$1')
+  );
+}
+
+function buildScriptHasMigrationSideEffect(script) {
+  return /\b(?:payload\s+migrate|prisma\s+migrate|knex\s+migrate|sequelize\s+db:migrate|db:migrate|migrate(?::|\s|$)|migration)\b/i.test(String(script));
+}
+
+function recSeparatesTurboBuildSideEffects(text) {
+  return /\b(?:split|separate|move|keep)\b[^.\n]{0,180}\b(?:migrations?|side effects?|payload migrate|prisma migrate)\b[^.\n]{0,180}\b(?:outside|before|uncached|separate)\b/i.test(text) ||
+    /\b(?:cache|enable caching for)\b[^.\n]{0,120}\b(?:buildonly|pure build|next build)\b[^.\n]{0,180}\b(?:not|without|after separating)\b[^.\n]{0,120}\b(?:migrations?|side effects?)\b/i.test(text);
 }
 
 function recText(rec) {
