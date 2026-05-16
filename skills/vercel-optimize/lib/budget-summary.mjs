@@ -72,8 +72,8 @@ export function buildBudgetSummary(gate) {
 function buildChatPreview({ shouldAsk, totalPassed, currentBudget, skipped, topInvestigating, topSkipped, reason }) {
   if (!shouldAsk) return `Audit scope: no question needed — ${reason}.`;
   const lines = [];
-  lines.push(`Vercel metrics found ${totalPassed} potential issue${totalPassed === 1 ? '' : 's'} worth checking. By default I'll inspect the ${currentBudget} strongest now; ${skipped} will stay in the report for a larger run.`);
-  lines.push(`Choose a larger scope if you want broader coverage. More checks take longer and may still end with no code change recommended.`);
+  lines.push(`Found ${totalPassed} potential issue${totalPassed === 1 ? '' : 's'} worth checking. By default I'll inspect the ${currentBudget} strongest now; ${skipped} will stay in the report for a larger run.`);
+  lines.push(`Choose a larger scope if you want broader coverage. More checks take longer.`);
   if (topInvestigating.length > 0) {
     lines.push('');
     lines.push(`Checking now${topInvestigating.length < currentBudget ? ` (${topInvestigating.length} shown)` : ''}:`);

@@ -242,7 +242,7 @@ The script returns a structured object:
   "budgetSource": "default",
   "skipped": 15,
   "printContract": "Print chatPreview verbatim by copying exactChatMessage.body as a chat message before asking questionText. Do not summarize, truncate, reorder, shorten, or rewrite options.",
-  "chatPreview": "Vercel metrics found 21 potential issues worth checking. By default I'll inspect the 6 strongest now; 15 will stay in the report for a larger run.\nChoose a larger scope if you want broader coverage. More checks take longer and may still end with no code change recommended.\n\nChecking now:\n  1. Slow route on /event - function invocations: 2,867,116; 95th percentile duration: 3010ms\n  ...\n\nOnly checked if you expand this run (15):\n  1. Slow route on /event/[code]/[location]/register - function invocations: 118,267; 95th percentile duration: 735ms\n  ...",
+  "chatPreview": "Found 21 potential issues worth checking. By default I'll inspect the 6 strongest now; 15 will stay in the report for a larger run.\nChoose a larger scope if you want broader coverage. More checks take longer.\n\nChecking now:\n  1. Slow route on /event - function invocations: 2,867,116; 95th percentile duration: 3010ms\n  ...\n\nOnly checked if you expand this run (15):\n  1. Slow route on /event/[code]/[location]/register - function invocations: 118,267; 95th percentile duration: 735ms\n  ...",
   "exactChatMessage": {
     "body": "same string as chatPreview",
     "lineCount": 43,

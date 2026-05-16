@@ -102,7 +102,7 @@ test('renderBudgetSummaryMarkdown: lists investigating + skipped + options', () 
   }));
   const md = renderBudgetSummaryMarkdown(s);
   assert.match(md, /Checking now/);
-  assert.match(md, /Vercel metrics found/);
+  assert.match(md, /Found \d+ potential issue/);
   assert.match(md, /Only checked if you expand this run \(1\)/);
   assert.match(md, /Slow route on \/a - function invocations: 10,000; 95th percentile duration: 900ms/);
   assert.match(md, /Low cache-hit route on \/b - requests: 5,000; cache hit rate: 0%/);
@@ -189,8 +189,9 @@ test('buildBudgetSummary: budget preview avoids internal shorthand while raw can
   assert.doesNotMatch(JSON.stringify(s.questionPayload), /budget checkpoint|follow-up metrics|investigation threshold|candidate/i);
   assert.doesNotMatch(s.chatPreview, /\d+-\d+×/);
   assert.doesNotMatch(s.options.map((o) => o.rationale).join('\n'), /\d+-\d+×/);
-  assert.match(s.chatPreview, /Vercel metrics found 2 potential issues worth checking/);
-  assert.match(s.chatPreview, /More checks take longer and may still end with no code change recommended/);
+  assert.match(s.chatPreview, /Found 2 potential issues worth checking/);
+  assert.match(s.chatPreview, /More checks take longer\./);
+  assert.doesNotMatch(s.chatPreview, /Vercel metrics found|no code change recommended/i);
   assert.match(s.options[0].label, /default/);
   assert.match(s.options[0].rationale, /fastest first pass/);
   assert.match(s.options[1].rationale, /most complete/);
