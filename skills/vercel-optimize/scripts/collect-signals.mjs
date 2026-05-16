@@ -65,7 +65,7 @@ async function main() {
       'NO_PROJECT_ID: pass one as argv, set VERCEL_PROJECT_ID, or run `vercel link` in this directory.'
     );
   }
-  log(`projectId=${project.projectId} orgId=${project.orgId ?? '(none)'} (source: ${project.source})`);
+  log(`project link resolved (source=${project.source}; teamScope=${project.orgId ? 'yes' : 'no'})`);
 
   const scope = project.orgId || undefined;
 

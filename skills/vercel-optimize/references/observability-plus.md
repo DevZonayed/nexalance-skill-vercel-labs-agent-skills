@@ -58,6 +58,18 @@ If the host supports a structured question tool, use this exact customer-facing 
 
 Use the full product name in this question. Do not abbreviate product names or metrics in customer-facing blocker copy.
 
+## After The User Chooses
+
+If the user chooses **Enable and re-run**, stop after this short response:
+
+```md
+Enable Observability Plus from the Vercel dashboard's Observability tab, then tell me to rerun. I'll restart the metric-backed audit once route-level metrics are available.
+```
+
+Do not include raw team IDs, org IDs, project IDs, pricing language, dashboard screenshots, or extra persuasion. The docs link in the blocker message already covers availability and billing details.
+
+If the user chooses **Run scanner-only**, continue with the scanner-only steps below.
+
 ## Blocker Copy
 
 | Blocker | Detail |

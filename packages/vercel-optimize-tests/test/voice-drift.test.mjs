@@ -51,6 +51,17 @@ test('voice drift: Observability Plus blocker question uses exact plain copy', a
   assert.doesNotMatch(content, /\b(O11y|OPlus|Oplus|O-Plus|perf|CWV)\b|obs\+/);
 });
 
+test('voice drift: Observability Plus post-choice copy avoids IDs and pricing language', async () => {
+  const content = await readFile(join(ROOT, 'references', 'observability-plus.md'), 'utf-8');
+  assert.match(content, /If the user chooses \*\*Enable and re-run\*\*/);
+  assert.match(
+    content,
+    /Enable Observability Plus from the Vercel dashboard's Observability tab, then tell me to rerun\./
+  );
+  assert.match(content, /Do not include raw team IDs, org IDs, project IDs, pricing language/);
+  assert.doesNotMatch(content, /paid add-on|paid feature|just say the word/i);
+});
+
 test('voice drift: generated brief does not contain "OPlus" shorthand', () => {
   const md = buildBrief({
     candidate: {
