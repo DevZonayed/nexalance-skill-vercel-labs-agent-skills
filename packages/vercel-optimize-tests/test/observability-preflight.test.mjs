@@ -46,6 +46,18 @@ test('classifyObservabilityPlusConfiguration: no_oplus_probe on public API not-e
   assert.match(r.detail, /not enabled/);
 });
 
+test('classifyObservabilityPlusConfiguration: no_oplus_probe on CLI OPLUS_REQUIRED response', () => {
+  const r = classifyObservabilityPlusConfiguration({
+    ok: false,
+    code: 'OPLUS_REQUIRED',
+    stderr: 'Error: Observability Plus is not enabled (404)',
+  }, { projectId: 'prj_target' });
+
+  assert.equal(r.ok, true);
+  assert.equal(r.access, false);
+  assert.equal(r.blocker, 'no_oplus_probe');
+});
+
 test('classifyObservabilityPlusConfiguration: generic 404 not-enabled text is inconclusive', () => {
   const r = classifyObservabilityPlusConfiguration({
     ok: false,

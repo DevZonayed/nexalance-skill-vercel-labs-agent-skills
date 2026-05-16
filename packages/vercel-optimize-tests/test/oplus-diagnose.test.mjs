@@ -27,6 +27,20 @@ test('oplus diag: queries all returned payment_required → payment_required blo
   assert.match(r.detail, /4\/4/);
 });
 
+test('oplus diag: payment_required with subscription-required text → no_oplus_probe', () => {
+  const metrics = {
+    observabilityPlusCanary: {
+      ok: false,
+      code: 'payment_required',
+      message: 'A subscription to Observability Plus is required',
+    },
+  };
+  const r = diagnoseObservabilityPlus(metrics, true);
+  assert.equal(r.usable, false);
+  assert.equal(r.blocker, 'no_oplus_probe');
+  assert.match(r.detail, /require Observability Plus/);
+});
+
 test('oplus diag: queries all hit daily quota → daily_quota_exceeded blocker', () => {
   const metrics = {
     fnDurationP95ByRoute: { ok: false, code: 'DAILY_QUOTA_EXCEEDED' },

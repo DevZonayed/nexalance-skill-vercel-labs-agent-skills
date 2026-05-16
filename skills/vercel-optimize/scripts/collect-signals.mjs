@@ -25,8 +25,30 @@ const SCHEMA_VERSION = '1.2';
 
 const log = (...args) => console.error('[collect-signals]', ...args);
 
+function parseArgs(argv) {
+  let explicitProjectId = null;
+  let continueWithoutObservability = process.env.VERCEL_OPTIMIZE_CONTINUE_WITHOUT_OBSERVABILITY === '1';
+
+  for (const arg of argv) {
+    if (arg === '--continue-without-observability') {
+      continueWithoutObservability = true;
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      throw new Error(`UNKNOWN_ARG: ${arg}`);
+    }
+    if (!explicitProjectId) {
+      explicitProjectId = arg;
+      continue;
+    }
+    throw new Error(`UNKNOWN_ARG: ${arg}`);
+  }
+
+  return { explicitProjectId, continueWithoutObservability };
+}
+
 async function main() {
-  const explicitProjectId = process.argv[2];
+  const { explicitProjectId, continueWithoutObservability } = parseArgs(process.argv.slice(2));
 
   log('checking Vercel CLI version…');
   const cli = await checkCliVersion();
@@ -65,6 +87,80 @@ async function main() {
   if (oplus && schema) {
     const count = Array.isArray(schema) ? schema.length : (schema.metrics?.length ?? 0);
     log(`metric catalog: ${count} metrics available`);
+  }
+
+  // Check one cheap metric before pulling slower project context. If this fails,
+  // the orchestrator can ask the user immediately instead of waiting on billing.
+  let metrics = {};
+  let metricsCanaryOk = false;
+  if (oplus) {
+    log(`checking Observability Plus metrics access (window=${TIME_WINDOW})…`);
+    const t0 = Date.now();
+    const canary = await queryMetric('vercel.request.count', {
+      aggregation: 'sum',
+      since: TIME_WINDOW,
+      limit: 1,
+      scope,
+    });
+    metricsCanaryOk = !!canary?.ok;
+    if (!metricsCanaryOk) {
+      metrics = {
+        observabilityPlusCanary: {
+          ...canary,
+          metricId: 'vercel.request.count',
+          aggregation: 'sum',
+        },
+      };
+      log(`metrics access check failed: ${canary?.code ?? 'unknown'} — skipping full metrics fan-out`);
+    } else {
+      log(`metrics access check passed in ${Date.now() - t0}ms`);
+    }
+  } else {
+    log('skipping metric queries (Observability Plus preflight did not confirm access)');
+  }
+
+  let oplusDiag = observabilityPlusConfig.access === false
+    ? {
+        usable: false,
+        blocker: observabilityPlusConfig.blocker,
+        detail: observabilityPlusConfig.detail,
+      }
+    : (metricsCanaryOk
+        ? { usable: true, blocker: null, detail: 'Observability Plus metrics access check passed.' }
+        : diagnoseObservabilityPlus(metrics, oplus));
+
+  if (!oplusDiag.usable && !continueWithoutObservability) {
+    writeOutput({
+      schemaVersion: SCHEMA_VERSION,
+      collectedAt: new Date().toISOString(),
+      timeWindow: TIME_WINDOW,
+      projectId: project.projectId,
+      orgId: project.orgId,
+      projectIdSource: project.source,
+      observabilityPlus: oplus,
+      observabilityPlusPreflight: observabilityPlusConfig,
+      observabilityPlusUsable: oplusDiag.usable,
+      observabilityPlusBlocker: oplusDiag.blocker,
+      observabilityPlusBlockerDetail: oplusDiag.detail,
+      plan: {
+        plan: 'uncertain',
+        reason: 'not collected before Observability Plus blocker confirmation',
+      },
+      project: null,
+      contract: null,
+      usage: null,
+      usageScope: null,
+      usageTeamTotal: null,
+      usageError: 'NOT_COLLECTED_OBSERVABILITY_BLOCKED',
+      stack: null,
+      metrics,
+      metricsSchema: schema,
+    }, oplusDiag);
+    return;
+  }
+
+  if (!oplusDiag.usable && continueWithoutObservability) {
+    log('continuing after Observability Plus blocker because --continue-without-observability was set');
   }
 
   log('pulling project config + contract + usage in parallel…');
@@ -117,29 +213,10 @@ async function main() {
   log(`stack: ${stack.framework}@${stack.frameworkVersion ?? '?'} ${stack.hasAppRouter ? 'app-router' : ''}${stack.hasPagesRouter ? ' pages-router' : ''}${stack.orm !== 'none' ? ` orm=${stack.orm}` : ''}`);
 
   // Each query is wrapped; one failure degrades only that metric.
-  let metrics = {};
-  if (oplus) {
-    log(`checking Observability Plus metrics access (window=${TIME_WINDOW})…`);
+  if (oplus && metricsCanaryOk) {
+    log(`querying observability metrics (${QUERIES.length} metrics in parallel)…`);
     const t0 = Date.now();
-    const canary = await queryMetric('vercel.request.count', {
-      aggregation: 'sum',
-      since: TIME_WINDOW,
-      limit: 1,
-      scope,
-    });
-    if (!canary?.ok) {
-      metrics = {
-        observabilityPlusCanary: {
-          ...canary,
-          metricId: 'vercel.request.count',
-          aggregation: 'sum',
-        },
-      };
-      log(`metrics access check failed: ${canary?.code ?? 'unknown'} — skipping full metrics fan-out`);
-    } else {
-      log(`querying observability metrics (${QUERIES.length} metrics in parallel)…`);
-      metrics = await collectMetrics(scope);
-    }
+    metrics = await collectMetrics(scope);
     const wallMs = Date.now() - t0;
     const counts = Object.fromEntries(
       Object.entries(metrics).map(([k, v]) => {
@@ -150,8 +227,6 @@ async function main() {
       })
     );
     log(`metrics collected in ${wallMs}ms: ${JSON.stringify(counts)}`);
-  } else {
-    log('skipping metric queries (Observability Plus preflight did not confirm access)');
   }
 
   // The `vercel metrics schema` probe alone is NOT a reliable usability signal:
@@ -159,7 +234,7 @@ async function main() {
   // Plus lapsed / over quota) or FORBIDDEN (auth-scope mismatch). Diagnose AFTER
   // running queries by counting failure codes so the orchestrator can PAUSE and
   // surface the choice before falling back to scanner-only mode.
-  const oplusDiag = observabilityPlusConfig.access === false
+  oplusDiag = observabilityPlusConfig.access === false
     ? {
         usable: false,
         blocker: observabilityPlusConfig.blocker,
@@ -194,6 +269,10 @@ async function main() {
     metricsSchema: schema,
   };
 
+  writeOutput(output, oplusDiag);
+}
+
+function writeOutput(output, oplusDiag) {
   if (!oplusDiag.usable) {
     log(`⚠ Observability Plus is NOT usable on this project: blocker=${oplusDiag.blocker} (${oplusDiag.detail})`);
     log('   The orchestrator should PAUSE and follow the blocker-specific remediation before proceeding.');
@@ -302,6 +381,20 @@ export function diagnoseObservabilityPlus(metrics, oplusProbe) {
       };
     }
     if (/payment_required/.test(topCode)) {
+      const text = failures
+        .map((f) => `${f.message ?? ''}\n${f.stderr ?? ''}`)
+        .join('\n')
+        .toLowerCase();
+      if (
+        /subscription to observability plus[\s\S]{0,160}required/.test(text) ||
+        /observability plus[\s\S]{0,160}not enabled/.test(text)
+      ) {
+        return {
+          usable: false,
+          blocker: 'no_oplus_probe',
+          detail: `${top[1]}/${entries.length} metric queries require Observability Plus. Enable Observability Plus, then re-run for the full audit.`,
+        };
+      }
       return {
         usable: false,
         blocker: 'payment_required',

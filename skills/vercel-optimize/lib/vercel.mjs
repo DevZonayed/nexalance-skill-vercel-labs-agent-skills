@@ -220,8 +220,9 @@ export function classifyObservabilityPlusConfiguration(result, { projectId } = {
   const text = `${result?.message ?? ''}\n${result?.stderr ?? ''}`.toLowerCase();
   const mentionsObservabilityPlusNotEnabled =
     /observability plus[\s\S]{0,160}not enabled/.test(text) ||
-    /not enabled[\s\S]{0,160}observability plus/.test(text);
-  if ((code === 'not_found' || code === '404') && mentionsObservabilityPlusNotEnabled) {
+    /not enabled[\s\S]{0,160}observability plus/.test(text) ||
+    /subscription to observability plus[\s\S]{0,160}required/.test(text);
+  if (code === 'oplus_required' || ((code === 'not_found' || code === '404') && mentionsObservabilityPlusNotEnabled)) {
     return {
       ok: true,
       source,

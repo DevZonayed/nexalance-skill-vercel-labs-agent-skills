@@ -67,8 +67,9 @@ For `no_traffic`, do not use this template. Tell the user the project has no mea
 
 If the user picks scanner-only mode:
 
-1. Run code scanners.
-2. Launch only traffic-independent findings.
-3. Render a clear data gap: per-route metric gates were skipped because Observability Plus data was unavailable.
+1. Re-run `node scripts/collect-signals.mjs [projectId] --continue-without-observability` if the current `signals.json` stopped at the fast blocker (`usageError=NOT_COLLECTED_OBSERVABILITY_BLOCKED` or `project=null`).
+2. Run code scanners.
+3. Launch only traffic-independent findings.
+4. Render a clear data gap: per-route metric gates were skipped because Observability Plus data was unavailable.
 
 Do not imply the scanner-only report is a complete optimization audit.

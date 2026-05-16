@@ -103,6 +103,7 @@ node scripts/collect-signals.mjs [projectId]
 The script handles:
 - Preflight (CLI version, auth, project ID resolution)
 - Observability Plus configuration preflight via the public `vercel api` OpenAPI surface, followed by a one-query metrics access check before full metrics fan-out
+- Fast blocker output: when Observability Plus is unavailable, it writes a minimal `signals.json` and stops before slower project config / usage collection unless `--continue-without-observability` is passed
 - `vercel api /v9/projects/<id>` for project config
 - `vercel contract` for plan inference (commitments[].category: Spend=Pro, Usage=Enterprise)
 - `vercel usage --format json --from <14d ago>` for billing
@@ -148,6 +149,14 @@ jq '{observabilityPlus, observabilityPlusUsable, observabilityPlusBlocker, obser
 | `all_failed_other` | Every query failed with some other error | Show the raw error code; ask if they want to continue in scanner-only mode |
 
 **Do NOT silently fall back to scanner-only mode.** The user chose this skill expecting an optimization audit; if we can't deliver one, present the explicit choice.
+
+If the user chooses scanner-only mode after a blocker, re-run collection with:
+
+```bash
+node scripts/collect-signals.mjs [projectId] --continue-without-observability > "$RUN_DIR/vercel-signals.json"
+```
+
+Then continue with scan + merge. This second run may collect project config and usage, but it must happen only after the user accepts the limited audit.
 
 **Render the template in [references/observability-plus.md](references/observability-plus.md) VERBATIM.** Adapt only the one-line specifics slot from `observabilityPlusBlockerDetail`. The template is ~10 lines and contains exactly what the user needs to decide:
 - the specific problem,
