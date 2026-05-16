@@ -8,6 +8,7 @@ import {
   checkAuth,
   resolveProjectId,
   hasObservabilityPlus,
+  checkObservabilityPlusConfiguration,
   getMetricsSchema,
   getProjectConfig,
   getContract,
@@ -46,8 +47,18 @@ async function main() {
 
   const scope = project.orgId || undefined;
 
-  log('probing Observability Plus capability…');
-  const oplus = await hasObservabilityPlus(scope);
+  log('checking Observability Plus configuration…');
+  const observabilityPlusConfig = await checkObservabilityPlusConfiguration({
+    orgId: project.orgId,
+    projectId: project.projectId,
+  });
+  log(`observabilityPlusPreflight=${observabilityPlusConfig.access === true ? 'enabled' : observabilityPlusConfig.blocker ?? 'unknown'} (${observabilityPlusConfig.source})`);
+
+  let oplus = observabilityPlusConfig.access === true;
+  if (observabilityPlusConfig.access == null) {
+    log('Observability Plus configuration preflight inconclusive; falling back to metrics schema probe…');
+    oplus = await hasObservabilityPlus(scope);
+  }
   log(`observabilityPlus=${oplus}`);
 
   const schema = oplus ? await getMetricsSchema(scope) : null;
@@ -108,9 +119,27 @@ async function main() {
   // Each query is wrapped; one failure degrades only that metric.
   let metrics = {};
   if (oplus) {
-    log(`querying observability metrics (window=${TIME_WINDOW}, ${QUERIES.length} metrics in parallel)…`);
+    log(`checking Observability Plus metrics access (window=${TIME_WINDOW})…`);
     const t0 = Date.now();
-    metrics = await collectMetrics(scope);
+    const canary = await queryMetric('vercel.request.count', {
+      aggregation: 'sum',
+      since: TIME_WINDOW,
+      limit: 1,
+      scope,
+    });
+    if (!canary?.ok) {
+      metrics = {
+        observabilityPlusCanary: {
+          ...canary,
+          metricId: 'vercel.request.count',
+          aggregation: 'sum',
+        },
+      };
+      log(`metrics access check failed: ${canary?.code ?? 'unknown'} — skipping full metrics fan-out`);
+    } else {
+      log(`querying observability metrics (${QUERIES.length} metrics in parallel)…`);
+      metrics = await collectMetrics(scope);
+    }
     const wallMs = Date.now() - t0;
     const counts = Object.fromEntries(
       Object.entries(metrics).map(([k, v]) => {
@@ -122,7 +151,7 @@ async function main() {
     );
     log(`metrics collected in ${wallMs}ms: ${JSON.stringify(counts)}`);
   } else {
-    log('skipping metric queries (Observability Plus schema probe failed)');
+    log('skipping metric queries (Observability Plus preflight did not confirm access)');
   }
 
   // The `vercel metrics schema` probe alone is NOT a reliable usability signal:
@@ -130,7 +159,13 @@ async function main() {
   // Plus lapsed / over quota) or FORBIDDEN (auth-scope mismatch). Diagnose AFTER
   // running queries by counting failure codes so the orchestrator can PAUSE and
   // surface the choice before falling back to scanner-only mode.
-  const oplusDiag = diagnoseObservabilityPlus(metrics, oplus);
+  const oplusDiag = observabilityPlusConfig.access === false
+    ? {
+        usable: false,
+        blocker: observabilityPlusConfig.blocker,
+        detail: observabilityPlusConfig.detail,
+      }
+    : diagnoseObservabilityPlus(metrics, oplus);
 
 
   const output = {
@@ -141,6 +176,7 @@ async function main() {
     orgId: project.orgId,
     projectIdSource: project.source,
     observabilityPlus: oplus,
+    observabilityPlusPreflight: observabilityPlusConfig,
     observabilityPlusUsable: oplusDiag.usable,
     observabilityPlusBlocker: oplusDiag.blocker,
     observabilityPlusBlockerDetail: oplusDiag.detail,
@@ -230,9 +266,9 @@ function sumUsageCosts(usage) {
 }
 
 // Returns { usable, blocker, detail }. `blocker` enum:
-//   null | 'no_oplus_probe' | 'payment_required' | 'forbidden' |
-//   'daily_quota_exceeded' | 'project_not_found' | 'not_linked' |
-//   'all_failed_other' | 'no_traffic'
+//   null | 'no_oplus_probe' | 'project_disabled' | 'payment_required' |
+//   'forbidden' | 'daily_quota_exceeded' | 'project_not_found' |
+//   'not_linked' | 'all_failed_other' | 'no_traffic'
 export function diagnoseObservabilityPlus(metrics, oplusProbe) {
   if (!oplusProbe) {
     return {

@@ -27,6 +27,10 @@ The merged `signals.json` has this top-level shape:
   "orgId": "team_xxx",
   "projectIdSource": "repo.json" | "project.json" | "arg" | "env",
   "observabilityPlus": true | false,
+  "observabilityPlusPreflight": { /* public OpenAPI configuration probe result */ },
+  "observabilityPlusUsable": true | false,
+  "observabilityPlusBlocker": null | "no_oplus_probe" | "project_disabled" | "payment_required" | "forbidden" | "daily_quota_exceeded" | "project_not_found" | "not_linked" | "all_failed_other" | "no_traffic",
+  "observabilityPlusBlockerDetail": "...",
   "plan": { "plan": "pro" | "enterprise" | "uncertain", "reason": "..." },
   "project": { /* /v9/projects/:id response, scoped to orgId via ?teamId */ },
   "contract": { "context": "...", "commitments": [], "totalCommitments": 0 },
@@ -50,7 +54,8 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | Auth | `vercel whoami` | Everything | Exit with "run `vercel login`" |
 | CLI version | `vercel --version` | Everything | Exit with "upgrade to v53+" |
 | Project ID + Org ID | `.vercel/repo.json` (newer) or `.vercel/project.json` (legacy) → `VERCEL_PROJECT_ID` + `VERCEL_ORG_ID` → argv | Everything | Exit with "run `vercel link` or pass projectId" |
-| Observability Plus capability | `vercel metrics schema --format json --scope <orgId>` exit code | All `metrics.*` signals | Set `observabilityPlus=false`; downstream gates that need metrics emit no candidates; scanner findings still run |
+| Observability Plus configuration | Public OpenAPI endpoint via `vercel api /v1/observability/manage/configuration/projects?teamId=<orgId>` | All `metrics.*` signals | Stop early when the team lacks Observability Plus or this project is disabled |
+| Observability Plus metrics access | One canary `vercel metrics vercel.request.count --since 14d --limit 1`, then full fan-out only if it succeeds | All `metrics.*` signals | Set `observabilityPlusUsable=false` with blocker detail; downstream gates that need metrics emit no candidates; scanner findings still run |
 | Project config | `vercel api /v9/projects/:id?teamId=<orgId>` | Fluid Compute, BotID, Speed Insights, security flags | `{error: "..."}` placeholder; gates that need it skip |
 | Plan tier | `vercel contract --format json --scope <orgId>` → `inferPlan()` | Cost-context framing only | `plan="uncertain"`; cost magnitudes still computed from `usage.services[].billedCost` |
 | Billing usage | `vercel usage --format json --from <14d> --to <today> --group-by project --scope <orgId>` | Cost magnitude framing, billing-driven candidates | `null` + `usageError` set; cost magnitudes degrade to "small" by default |
@@ -87,7 +92,8 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 
 | Code | Meaning | Skill behavior |
 |---|---|---|
-| `OPLUS_REQUIRED` | Observability Plus not enabled on team | Disable all `metrics.*` queries this run; mark `observabilityPlus=false`; the gate emits scanner + platform candidates only |
+| `no_oplus_probe` | Observability Plus not enabled on team | Stop before full metric fan-out; ask whether to enable Observability Plus or run scanner-only |
+| `project_disabled` | Observability Plus enabled for team but disabled for project | Stop before full metric fan-out; ask the user to enable Observability Plus for this project or continue scanner-only |
 | `USAGE_UNAVAILABLE` | `vercel usage` 404 — team has no Costs feature enabled | `usage=null`; cost-tier gates emit lower-priority candidates; billing section of the report shows "unavailable" |
 | `PROJECT_NOT_FOUND` | `vercel api /v9/projects/<id>` 404 (typically wrong scope) | `project={error}`; platform gates that depend on project config skip; report flags the data gap |
 | `invalid_filter_dimension` / `invalid_dimension` | Metric query used a dimension the metric doesn't support | Metric returns `{ok:false, code, allowedValues}`; consumer can introspect and adjust |

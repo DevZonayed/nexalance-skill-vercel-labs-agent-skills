@@ -46,6 +46,7 @@ Choose one:
 | `not_linked` | `Detected: this app directory is not linked to a Vercel project.` |
 | `forbidden` | `Detected: the Vercel CLI is authenticated to a team that cannot read this project.` |
 | `project_not_found` | `Detected: the project ID is not visible to the authenticated team.` |
+| `project_disabled` | `Detected: Observability Plus is enabled for the team but disabled for this project.` |
 | `all_failed_other` | `Detected: every per-route metric query failed. Error code: <code>.` |
 
 For `not_linked`, do not use the Observability Plus template. Link the app directory first:
@@ -57,6 +58,8 @@ vercel link --yes --project <project-name-or-id> --cwd <app-dir>
 Add `--team <team-id-or-slug>` when the team is known. If the user supplied both app path and project name, run the link command instead of asking them what to do.
 
 For `forbidden` and `project_not_found`, ask the user to run `vercel switch <team>` or verify the project ID before presenting an Observability Plus upgrade choice.
+
+For `project_disabled`, do not present it as a team subscription problem. Ask the user to enable Observability Plus for this project, then re-run.
 
 For `no_traffic`, do not use this template. Tell the user the project has no meaningful traffic in the 14-day window, then ask whether to run scanner-only mode now or come back after traffic accumulates.
 

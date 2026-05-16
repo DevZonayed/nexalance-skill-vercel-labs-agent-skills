@@ -102,7 +102,7 @@ node scripts/collect-signals.mjs [projectId]
 
 The script handles:
 - Preflight (CLI version, auth, project ID resolution)
-- Observability Plus capability probe
+- Observability Plus configuration preflight via the public `vercel api` OpenAPI surface, followed by a one-query metrics access check before full metrics fan-out
 - `vercel api /v9/projects/<id>` for project config
 - `vercel contract` for plan inference (commitments[].category: Spend=Pro, Usage=Enterprise)
 - `vercel usage --format json --from <14d ago>` for billing
@@ -144,6 +144,7 @@ jq '{observabilityPlus, observabilityPlusUsable, observabilityPlusBlocker, obser
 | `not_linked` | `vercel metrics` cannot find project linkage in the app directory | Link the app directory and rerun Step 1. If the user supplied app path + project name, run `vercel link --yes --project <project-name-or-id> --cwd <app-dir>`; add `--team <team-id-or-slug>` when known. Do not fall back to scanner-only unless the user declines linking |
 | `forbidden` | Auth-scope mismatch — wrong team | Do NOT pitch Observability Plus; tell the user to run `vercel switch <team>` and re-run |
 | `project_not_found` | Project ID not visible to auth'd team | Same — fix auth first, no Observability Plus pitch |
+| `project_disabled` | Observability Plus is enabled for the team but disabled for this project | Tell the user to enable Observability Plus for this project, then re-run. Do not fall back to scanner-only unless the user declines enabling it |
 | `all_failed_other` | Every query failed with some other error | Show the raw error code; ask if they want to continue in scanner-only mode |
 
 **Do NOT silently fall back to scanner-only mode.** The user chose this skill expecting an optimization audit; if we can't deliver one, present the explicit choice.

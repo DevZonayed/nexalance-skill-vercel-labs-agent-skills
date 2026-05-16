@@ -172,6 +172,91 @@ export async function getMetricsSchema(scope) {
   return r.ok ? r.data : null;
 }
 
+export async function checkObservabilityPlusConfiguration({ orgId, projectId } = {}) {
+  if (!orgId) {
+    return {
+      ok: false,
+      source: 'observability-configuration-api',
+      blocker: 'unknown',
+      detail: 'No team ID was available for the Observability Plus configuration preflight.',
+    };
+  }
+  const qs = `?teamId=${encodeURIComponent(orgId)}`;
+  const r = await runVercelJson(['api', `/v1/observability/manage/configuration/projects${qs}`]);
+  return classifyObservabilityPlusConfiguration(r, { projectId });
+}
+
+export function classifyObservabilityPlusConfiguration(result, { projectId } = {}) {
+  const source = 'observability-configuration-api';
+  if (result?.ok) {
+    const disabledProjects = Array.isArray(result.data?.disabledProjects) ? result.data.disabledProjects : [];
+    const disabled = projectId
+      ? disabledProjects.find((p) => String(p?.id ?? '') === String(projectId))
+      : null;
+    if (disabled) {
+      return {
+        ok: true,
+        source,
+        access: false,
+        blocker: 'project_disabled',
+        detail: 'Observability Plus is enabled for the team but disabled for this project.',
+        disabledProject: {
+          id: disabled.id,
+          name: disabled.name ?? null,
+          disabledAt: disabled.disabledAt ?? null,
+        },
+      };
+    }
+    return {
+      ok: true,
+      source,
+      access: true,
+      blocker: null,
+      detail: 'Observability Plus is enabled for this team/project.',
+    };
+  }
+
+  const code = String(result?.code ?? 'unknown').toLowerCase();
+  const text = `${result?.message ?? ''}\n${result?.stderr ?? ''}`.toLowerCase();
+  const mentionsObservabilityPlusNotEnabled =
+    /observability plus[\s\S]{0,160}not enabled/.test(text) ||
+    /not enabled[\s\S]{0,160}observability plus/.test(text);
+  if ((code === 'not_found' || code === '404') && mentionsObservabilityPlusNotEnabled) {
+    return {
+      ok: true,
+      source,
+      access: false,
+      blocker: 'no_oplus_probe',
+      detail: 'Observability Plus is not enabled for this team.',
+    };
+  }
+  if (/forbidden|not_authorized|403/.test(code) || /forbidden|not authorized|permission|403/.test(text)) {
+    return {
+      ok: false,
+      source,
+      access: null,
+      blocker: 'forbidden',
+      detail: 'Could not read Observability Plus configuration for this team. Run `vercel switch <team>` and verify access.',
+    };
+  }
+  if (/not_auth|unauthorized|401/.test(code) || /unauthorized|log in|credentials|401/.test(text)) {
+    return {
+      ok: false,
+      source,
+      access: null,
+      blocker: 'forbidden',
+      detail: 'Could not read Observability Plus configuration because the Vercel CLI is not authenticated.',
+    };
+  }
+  return {
+    ok: false,
+    source,
+    access: null,
+    blocker: 'unknown',
+    detail: `Could not determine Observability Plus configuration before querying metrics (code=${code}).`,
+  };
+}
+
 // Returns `{ok, ...}`. CLI summary defaults to top 10 groups under --group-by; widen via opts.limit.
 export async function queryMetric(metricId, opts = {}) {
   const args = ['metrics', metricId, '--format', 'json'];
