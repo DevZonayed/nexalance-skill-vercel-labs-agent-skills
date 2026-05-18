@@ -41,6 +41,7 @@ export async function verifyClaim(claim) {
     case 'cache_rec_not_error_dominated_or_acknowledged': return verifyCacheRecNotErrorDominatedOrAcknowledged(claim);
     case 'cache_control_header_syntax': return verifyCacheControlHeaderSyntax(claim);
     case 'cache_control_headers_citation': return verifyCacheControlHeadersCitation(claim);
+    case 'cache_policy_positive_or_no_ready_rec': return verifyCachePolicyPositiveOrNoReadyRec(claim);
     case 'cache_404_long_ttl_safety': return verifyCache404LongTtlSafety(claim);
     case 'route_error_not_found_status_and_scope': return verifyRouteErrorNotFoundStatusAndScope(claim);
     case 'immutable_dynamic_route_safety': return verifyImmutableDynamicRouteSafety(claim);
@@ -563,6 +564,25 @@ async function verifyCacheControlHeadersCitation({ rec }) {
   return {
     disposition: 'failed',
     reason: 'Cache-Control header changes need Vercel cache documentation citation',
+  };
+}
+
+async function verifyCachePolicyPositiveOrNoReadyRec({ rec }) {
+  if (!rec) return { disposition: 'unsupported', reason: 'cache_policy_positive_or_no_ready_rec requires rec' };
+  const text = recText(rec);
+  const positivePolicy = /\b(?:s-maxage|stale-while-revalidate|CDN-Cache-Control|Vercel-CDN-Cache-Control|Cache-Control:\s*public|next:\s*\{\s*revalidate|revalidate\s*[:=]\s*\d|cacheLife\s*\(|cacheTag\s*\(|['"`]use cache(?::\s*remote)?['"`]|Runtime Cache|getCache\s*\(|force-cache)\b/i.test(text);
+  if (positivePolicy) {
+    return { disposition: 'verified', reason: 'cache recommendation names a positive cache policy' };
+  }
+  if (/\b(?:no-store|no-cache|cache:\s*['"`]no-store['"`])\b/i.test(text)) {
+    return {
+      disposition: 'failed',
+      reason: 'cache candidates must not ship a no-store-only recommendation; if no-store is correct, report no change instead',
+    };
+  }
+  return {
+    disposition: 'failed',
+    reason: 'cache candidate recommendation does not name a cache policy; specify CDN headers, framework cache, Runtime Cache, or report no change',
   };
 }
 

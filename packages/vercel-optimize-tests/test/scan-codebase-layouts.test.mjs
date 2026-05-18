@@ -78,6 +78,35 @@ test('scan-codebase: caps workspace imports at 12 per route', async () => {
   }
 });
 
+test('scan-codebase: enumerates Nuxt and Astro routes for supported-framework preflight', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'vercel-optimize-scan-'));
+  try {
+    await writeFile(join(scratch, 'package.json'), JSON.stringify({
+      dependencies: { nuxt: '3.12.0', astro: '4.0.0' },
+    }));
+
+    await mkdir(join(scratch, 'pages', 'models'), { recursive: true });
+    await writeFile(join(scratch, 'pages', 'index.vue'), '<template>Home</template>\n');
+    await writeFile(join(scratch, 'pages', 'models', '[id].vue'), '<template>Model</template>\n');
+    await mkdir(join(scratch, 'server', 'api', 'models'), { recursive: true });
+    await writeFile(join(scratch, 'server', 'api', 'models', '[id].get.ts'), 'export default defineEventHandler(() => ({}));\n');
+
+    await mkdir(join(scratch, 'src', 'pages', 'blog'), { recursive: true });
+    await writeFile(join(scratch, 'src', 'pages', 'blog', '[slug].astro'), '<h1>Post</h1>\n');
+    await writeFile(join(scratch, 'src', 'pages', 'feed.xml.ts'), 'export async function GET() { return new Response(); }\n');
+
+    const { stdout } = await exec('node', [SCRIPT, scratch], { maxBuffer: 8 * 1024 * 1024 });
+    const out = JSON.parse(stdout);
+    assertRoute(out.routes, { routePath: '/', file: 'pages/index.vue', type: 'page' });
+    assertRoute(out.routes, { routePath: '/models/[id]', file: 'pages/models/[id].vue', type: 'page' });
+    assertRoute(out.routes, { routePath: '/api/models/[id]', file: 'server/api/models/[id].get.ts', type: 'route' });
+    assertRoute(out.routes, { routePath: '/blog/[slug]', file: 'src/pages/blog/[slug].astro', type: 'page' });
+    assertRoute(out.routes, { routePath: '/feed.xml', file: 'src/pages/feed.xml.ts', type: 'route' });
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
 function assertRoute(routes, expected) {
   assert.ok(
     routes.some((r) =>

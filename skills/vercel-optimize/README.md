@@ -23,6 +23,7 @@ Manual install: copy `skills/vercel-optimize` into `.agents/skills/vercel-optimi
 - Authenticated Vercel CLI session (`vercel login`)
 - Linked Vercel project (`vercel link`) or `VERCEL_PROJECT_ID`
 - Observability Plus for metric-backed route ranking
+- Supported framework for code recommendations: Next.js, SvelteKit, or Nuxt. Astro is limited; Hono, Remix, and unknown frameworks pause up front.
 
 If route-level metrics are unavailable, the skill pauses before scanner-only mode. Scanner-only can catch traffic-independent code issues, but it cannot rank hot routes or prove cost impact.
 

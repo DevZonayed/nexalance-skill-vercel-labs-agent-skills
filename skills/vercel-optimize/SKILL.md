@@ -1,6 +1,6 @@
 ---
 name: vercel-optimize
-description: Deep cost and performance optimization for any Vercel project. This skill pulls observability metrics, billing, and project config from the Vercel CLI, then investigates the codebase only where those metrics point, producing ranked recommendations with before/after code grounded in Vercel and Next.js documentation. Use this skill whenever the user asks to optimize a Vercel project, cut their Vercel bill, audit Vercel performance, investigate why a specific route is slow or expensive, find caching opportunities, reduce function invocations, or get a cost breakdown. Also use proactively whenever the user shares a Vercel deployment URL or mentions performance/cost concerns about a Next.js, SvelteKit, Astro, or Nuxt app deployed to Vercel.
+description: Deep cost and performance optimization for Vercel projects on supported frameworks: Next.js, SvelteKit, and Nuxt, with limited Astro support. This skill pulls observability metrics, billing, and project config from the Vercel CLI, then investigates the codebase only where those metrics point, producing ranked recommendations with before/after code grounded in Vercel and framework-aware documentation. Use this skill whenever the user asks to optimize a Vercel project, cut their Vercel bill, audit Vercel performance, investigate why a specific route is slow or expensive, find caching opportunities, reduce function invocations, or get a cost breakdown. Also use proactively whenever the user shares a Vercel deployment URL or mentions performance/cost concerns about a supported app deployed to Vercel.
 license: MIT
 metadata:
   version: "1.1.0"
@@ -42,13 +42,14 @@ Do not put auth tokens in shell commands. Use `vercel login` or pre-existing env
 
 The skill detects the framework from `package.json`. Current coverage:
 
-| Framework | Stack detection | Scanners | Playbook | Citation library | Notes |
+| Framework | Preflight status | Route mapping | Scanners | Playbook | Citation library | Notes |
 |---|---|---|---|---|---|
-| Next.js (App Router) | ✓ | ✓ (9 Next-shaped + 1 generic) | ✓ (5 application-profile) | 18 next-specific + 23 wildcard | Best supported |
-| Next.js (Pages Router) | ✓ | ✓ (most) | ✓ (saas/api-service) | same | Recs scoped to Pages Router idioms when detected |
-| SvelteKit | ✓ | ✓ (`sveltekit-prerender-missing`) | ✓ (`sveltekit.md`) | 10 sveltekit URLs | Routes enumerated from `src/routes/+page.svelte` / `+page.server.ts` / `+server.ts` |
-| Astro | ✓ | (Next-shaped only) | — | 3 astro URLs | Citation library has framework-aware entries; playbook contributed-PR pending |
-| Nuxt | ✓ | (Next-shaped only) | — | 3 nuxt URLs | Same shape as Astro |
+| Next.js (App Router) | supported | ✓ | ✓ (Next-shaped + generic) | ✓ (application-profile) | 18 next-specific + wildcard | Best supported |
+| Next.js (Pages Router) | supported | ✓ | ✓ (most) | ✓ (saas/api-service) | same | Recs scoped to Pages Router idioms when detected |
+| SvelteKit | supported | ✓ | ✓ (`sveltekit-prerender-missing`) | ✓ (`sveltekit.md`) | 10 sveltekit URLs | Routes from `src/routes/+page.svelte`, `+page.server.ts`, `+server.ts` |
+| Nuxt | supported | ✓ | generic | — | 3 nuxt URLs | Routes from `pages/**` and `server/api/**` / `server/routes/**` |
+| Astro | limited | ✓ | generic | — | 3 astro URLs | Metrics + generic route mapping; fewer framework-specific playbooks |
+| Hono / Remix / unknown | blocked by default | — | generic only if user continues | — | wildcard only | Continue only when the user accepts a limited platform/scanner audit |
 
 ✅ Right:
 ```bash
@@ -104,6 +105,7 @@ node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$RUN_
 
 The script handles:
 - Preflight (CLI version, auth, project ID resolution)
+- Framework support preflight from `package.json`. Unsupported frameworks stop before metric fan-out unless the user chooses `--continue-unsupported-framework`.
 - Observability Plus configuration preflight via the public `vercel api` OpenAPI surface, followed by a one-query metrics access check before full metrics fan-out
 - Fast blocker output: when Observability Plus is unavailable, it writes a minimal `signals.json` and stops before slower project config / usage collection unless `--continue-without-observability` is passed
 - `vercel api /v9/projects/<id>` for project config
@@ -132,7 +134,25 @@ The merge helper writes the `collect-signals` output at the top level and the `s
 
 ### 1.4 Observability Plus capability check — STOP AND ASK if blocked
 
-**This is a stop-and-ask point.** Before proceeding to Step 2, check `signals.observabilityPlusBlocker` (emitted by `collect-signals.mjs`). If non-null, the per-route metric queries did not produce usable data — and the entire premise of this skill (observability-anchored recommendations) depends on them.
+**This is a stop-and-ask point.** Before proceeding to Step 2, first check `signals.frameworkSupportBlocker`, then `signals.observabilityPlusBlocker`.
+
+If `signals.frameworkSupportBlocker === "unsupported_framework"`, pause before scanning or gating. Tell the user:
+
+```text
+This project uses <framework>. Vercel Optimize supports metric-backed code recommendations for Next.js, SvelteKit, and Nuxt. Astro support is limited. For <framework>, I can still run a limited platform/scanner audit, but route-level Vercel metrics may not map back to source files.
+
+Do you want me to continue with the limited audit, or stop here?
+```
+
+If the user continues, re-run collection with:
+
+```bash
+node scripts/collect-signals.mjs [projectId] --continue-unsupported-framework > "$RUN_DIR/vercel-signals.json" 2> "$RUN_DIR/collect.stderr"
+```
+
+Then scan + merge as usual. If the final report has no code recommendations, frame the reason as a framework/route-mapping limitation, not "nothing to do."
+
+Next, check `signals.observabilityPlusBlocker` (emitted by `collect-signals.mjs`). If non-null, the per-route metric queries did not produce usable data — and the entire premise of this skill (observability-anchored recommendations) depends on them.
 
 ```bash
 jq '{observabilityPlus, observabilityPlusUsable, observabilityPlusBlocker, observabilityPlusBlockerDetail}' signals.json

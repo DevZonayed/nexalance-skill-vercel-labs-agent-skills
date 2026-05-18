@@ -431,10 +431,11 @@ export async function detectStack(cwd = process.cwd()) {
     deps.astro ? 'astro' :
     deps['@sveltejs/kit'] ? 'sveltekit' :
     deps['@remix-run/react'] ? 'remix' :
+    deps.hono ? 'hono' :
     'unknown';
 
   const frameworkVersion = (() => {
-    const m = { next: 'next', nuxt: 'nuxt', astro: 'astro', sveltekit: '@sveltejs/kit', remix: '@remix-run/react' };
+    const m = { next: 'next', nuxt: 'nuxt', astro: 'astro', sveltekit: '@sveltejs/kit', remix: '@remix-run/react', hono: 'hono' };
     const dep = m[framework];
     if (!dep) return null;
     return (deps[dep] || '').replace(/^[\^~]/, '') || null;

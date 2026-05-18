@@ -861,6 +861,43 @@ test('extractClaims + verifyClaim: cache header recs must acknowledge error-domi
   assert.equal(supported.disposition, 'verified');
 });
 
+test('extractClaims + verifyClaim: cache candidates must name a positive cache policy', async () => {
+  const noStoreOnly = {
+    candidateRef: 'uncached_route:/api/models',
+    what: 'Make /api/models explicit.',
+    why: 'The route is dynamic.',
+    fix: "Set `cache: 'no-store'` on the fetch and return `Cache-Control: no-store`.",
+  };
+  const claim = extractClaims(noStoreOnly).find((c) => c.type === 'cache_policy_positive_or_no_ready_rec');
+  assert.ok(claim);
+  const failed = await verifyClaim(claim);
+  assert.equal(failed.disposition, 'failed');
+  assert.match(failed.reason, /no-store-only/);
+
+  const successPolicy = await verifyClaim({
+    ...claim,
+    rec: {
+      ...noStoreOnly,
+      fix: 'Cache only successful public responses with `CDN-Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`; keep error and fallback branches `no-store`.',
+    },
+  });
+  assert.equal(successPolicy.disposition, 'verified');
+});
+
+test('extractClaims + verifyClaim: cache candidates without a policy are held back', async () => {
+  const rec = {
+    candidateRef: 'cache_header_gap:/api/models',
+    what: 'Clean up /api/models caching.',
+    why: 'The route has many GET requests.',
+    fix: 'Move the helper into a shared utility.',
+  };
+  const claim = extractClaims(rec).find((c) => c.type === 'cache_policy_positive_or_no_ready_rec');
+  assert.ok(claim);
+  const failed = await verifyClaim(claim);
+  assert.equal(failed.disposition, 'failed');
+  assert.match(failed.reason, /does not name a cache policy/);
+});
+
 test('extractClaims + verifyClaim: immutable browser caching on dynamic routes needs byte-versioned URLs', async () => {
   const rec = {
     candidateRef: 'cache_header_gap:/api/docs-og',

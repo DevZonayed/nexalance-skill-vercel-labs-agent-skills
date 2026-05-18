@@ -44,13 +44,14 @@ The verifier extracts claims from `why`, `fix`, `currentBehavior`, `desiredBehav
 | 20 | `next_cache_tag_invalidation_supported` | Cache-lifetime rec claims existing tag invalidation | Fails unless every claimed `cacheTag()` has matching `revalidateTag()` / `updateTag()` evidence |
 | 21 | `cache_rec_not_error_dominated_or_acknowledged` | CDN cache rec targets a route with function 5xx metrics | Fails unless the rec excludes or acknowledges error traffic |
 | 22 | `cache_control_header_syntax` | CDN cache rec includes `Cache-Control`, `CDN-Cache-Control`, or `Vercel-CDN-Cache-Control` values | Fails on empty directives such as a trailing comma |
-| 23 | `cache_404_long_ttl_safety` | CDN cache rec mentions a 404 or not-found branch | Fails unless the rec keeps the 404/not-found branch uncached, short-lived, or explicitly separate |
-| 24 | `immutable_dynamic_route_safety` | Dynamic route rec uses browser `immutable` caching | Fails unless the URL is byte-versioned or the directive is scoped to Vercel's CDN |
-| 25 | `auth_guard_parallelization_safety` | Parallelization rec touches private/auth/ownership data | Fails if private data can be fetched before the auth or ownership guard |
-| 26 | `parallelization_impact_not_overclaimed` | Parallelization rec promises a helper-sized latency drop | Fails unless helper/span timing was measured |
-| 27 | `parallelization_not_cpu_bound_work` | Parallelization rec targets CPU or compile work | Fails unless measured wait/I/O time proves there is independent work to overlap |
-| 28 | `runtime_error_cause_supported` | Route-error rec names a runtime exception/root cause | Fails unless runtime logs or stack evidence support the cause |
-| 29 | `turbo_build_cache_safety` | Rec enables Turbo build caching | Fails when the package build script has migration side effects or Turbo outputs omit framework build output |
+| 23 | `cache_policy_positive_or_no_ready_rec` | Cache candidate emits a ready recommendation | Fails unless it names a positive cache policy; no-store-only belongs in no-change/observation output |
+| 24 | `cache_404_long_ttl_safety` | CDN cache rec mentions a 404 or not-found branch | Fails unless the rec keeps the 404/not-found branch uncached, short-lived, or explicitly separate |
+| 25 | `immutable_dynamic_route_safety` | Dynamic route rec uses browser `immutable` caching | Fails unless the URL is byte-versioned or the directive is scoped to Vercel's CDN |
+| 26 | `auth_guard_parallelization_safety` | Parallelization rec touches private/auth/ownership data | Fails if private data can be fetched before the auth or ownership guard |
+| 27 | `parallelization_impact_not_overclaimed` | Parallelization rec promises a helper-sized latency drop | Fails unless helper/span timing was measured |
+| 28 | `parallelization_not_cpu_bound_work` | Parallelization rec targets CPU or compile work | Fails unless measured wait/I/O time proves there is independent work to overlap |
+| 29 | `runtime_error_cause_supported` | Route-error rec names a runtime exception/root cause | Fails unless runtime logs or stack evidence support the cause |
+| 30 | `turbo_build_cache_safety` | Rec enables Turbo build caching | Fails when the package build script has migration side effects or Turbo outputs omit framework build output |
 
 Verifier guards:
 

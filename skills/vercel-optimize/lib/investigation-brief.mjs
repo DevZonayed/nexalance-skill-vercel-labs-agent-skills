@@ -282,6 +282,7 @@ export const KIND_INTERPRETATION_HINTS = {
     '`methodDistribution`: GET-only routes are cacheable; POST/PUT/DELETE are not. If the route is GET-heavy but BYPASSing, the cache headers are missing or wrong.',
     '`botShare` (bandwidth by bot_category): if bots dominate uncached bandwidth, the right rec may be Bot Protection rather than route caching.',
     '`bandwidthByCache`: pair with cacheBreakdown to confirm the dollar/bandwidth impact of moving uncached → cached.',
+    'A ready cache recommendation must name a positive cache policy. If the right answer is `no-store`, emit no recommendation / observation instead of a cache fix.',
   ],
   cold_start: [
     '`startTypeSplit`: cold vs hot vs prewarmed. Fluid Compute meaningfully helps when cold > 5%.',
@@ -446,6 +447,16 @@ export function buildBrief({
     lines.push('');
   }
 
+  const cachePolicyHints = cachePolicyGuidance(kind, stack);
+  if (cachePolicyHints.length > 0) {
+    lines.push('## Cache-policy decision');
+    lines.push('');
+    lines.push('Pick the narrowest cache mechanism that matches the source. Do not default to `no-store`; if data is unsafe to cache, abstain or emit a no-change observation.');
+    lines.push('');
+    for (const h of cachePolicyHints) lines.push(`- ${h}`);
+    lines.push('');
+  }
+
   lines.push(...renderSupportTopics(supportTopics));
   if (supportTopics.length > 0) lines.push('');
 
@@ -576,4 +587,23 @@ export function buildBrief({
   lines.push('');
 
   return lines.join('\n');
+}
+
+function cachePolicyGuidance(kind, stack = {}) {
+  if (!['uncached_route', 'cache_header_gap'].includes(kind)) return [];
+  const framework = stack.framework ?? 'unknown';
+  const cacheComponents = stack.cacheComponents === true;
+  const hints = [
+    'Whole public GET response: recommend `Cache-Control` / `CDN-Cache-Control` with `s-maxage` and `stale-while-revalidate`; name the TTL/freshness window and required `Vary` headers.',
+    'Fallback, 404, auth, preview, webhook, mutation, and per-user branches: keep them uncached or short-lived while caching only the safe success branch.',
+  ];
+  if (framework === 'next') {
+    if (cacheComponents) {
+      hints.push('Next.js with Cache Components: for reusable data inside the render path, prefer `use cache` / `use cache: remote` plus `cacheLife()` and `cacheTag()` when invalidation evidence exists.');
+    } else {
+      hints.push('Next.js data fetch path: use `fetch(..., { next: { revalidate: seconds } })` or route-level `revalidate` only when it matches the project version and route semantics.');
+    }
+  }
+  hints.push('Reusable server data where whole-response CDN caching is unsafe: recommend Runtime Cache only when the same result is reused across requests and the freshness/invalidation story is explicit.');
+  return hints;
 }

@@ -51,6 +51,13 @@ export function extractClaims(rec, ctx = {}) {
   }
 
   const cacheFiles = cacheRecommendationFiles(rec);
+  if (isCacheCandidate(rec)) {
+    claims.push({
+      type: 'cache_policy_positive_or_no_ready_rec',
+      rec,
+      sourceField: 'cache-policy',
+    });
+  }
   if (cacheFiles.length > 0) {
     claims.push({
       type: 'cache_vary_matches_dynamic_inputs',
@@ -301,6 +308,10 @@ function normalizeProjectRootDirectory(value) {
 function cacheRecommendationFiles(rec) {
   if (!recommendsSharedCache(rec)) return [];
   return recommendationFiles(rec);
+}
+
+function isCacheCandidate(rec) {
+  return /^(?:uncached_route|cache_header_gap):/.test(String(rec?.candidateRef ?? ''));
 }
 
 function recommendationFiles(rec) {

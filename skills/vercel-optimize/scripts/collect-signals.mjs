@@ -19,6 +19,7 @@ import {
   detectStack,
   redactSensitiveText,
 } from '../lib/vercel.mjs';
+import { classifyFrameworkSupport } from '../lib/framework-support.mjs';
 import { QUERIES, TIME_WINDOW, normalizerFor } from '../lib/queries.mjs';
 
 const SCHEMA_VERSION = '1.2';
@@ -28,10 +29,15 @@ const log = (...args) => console.error('[collect-signals]', ...args);
 function parseArgs(argv) {
   let explicitProjectId = null;
   let continueWithoutObservability = process.env.VERCEL_OPTIMIZE_CONTINUE_WITHOUT_OBSERVABILITY === '1';
+  let continueUnsupportedFramework = process.env.VERCEL_OPTIMIZE_CONTINUE_UNSUPPORTED_FRAMEWORK === '1';
 
   for (const arg of argv) {
     if (arg === '--continue-without-observability') {
       continueWithoutObservability = true;
+      continue;
+    }
+    if (arg === '--continue-unsupported-framework') {
+      continueUnsupportedFramework = true;
       continue;
     }
     if (arg.startsWith('--')) {
@@ -44,11 +50,11 @@ function parseArgs(argv) {
     throw new Error(`UNKNOWN_ARG: ${arg}`);
   }
 
-  return { explicitProjectId, continueWithoutObservability };
+  return { explicitProjectId, continueWithoutObservability, continueUnsupportedFramework };
 }
 
 async function main() {
-  const { explicitProjectId, continueWithoutObservability } = parseArgs(process.argv.slice(2));
+  const { explicitProjectId, continueWithoutObservability, continueUnsupportedFramework } = parseArgs(process.argv.slice(2));
 
   log('checking Vercel CLI version…');
   const cli = await checkCliVersion();
@@ -68,6 +74,48 @@ async function main() {
   log(`project link resolved (source=${project.source}; teamScope=${project.orgId ? 'yes' : 'no'})`);
 
   const scope = project.orgId || undefined;
+
+  log('checking framework support…');
+  const stack = await detectStack();
+  const frameworkSupport = classifyFrameworkSupport(stack);
+  log(`framework=${stack.framework}@${stack.frameworkVersion ?? '?'} support=${frameworkSupport.status}`);
+
+  if (!frameworkSupport.ok && !continueUnsupportedFramework) {
+    writeOutput({
+      schemaVersion: SCHEMA_VERSION,
+      collectedAt: new Date().toISOString(),
+      timeWindow: TIME_WINDOW,
+      projectId: project.projectId,
+      orgId: project.orgId,
+      projectIdSource: project.source,
+      frameworkSupport,
+      frameworkSupportBlocker: frameworkSupport.blocker,
+      frameworkSupportDetail: frameworkSupport.detail,
+      observabilityPlus: null,
+      observabilityPlusPreflight: null,
+      observabilityPlusUsable: null,
+      observabilityPlusBlocker: null,
+      observabilityPlusBlockerDetail: null,
+      plan: {
+        plan: 'uncertain',
+        reason: 'not collected before unsupported-framework confirmation',
+      },
+      project: null,
+      contract: null,
+      usage: null,
+      usageScope: null,
+      usageTeamTotal: null,
+      usageError: 'NOT_COLLECTED_UNSUPPORTED_FRAMEWORK',
+      stack,
+      metrics: {},
+      metricsSchema: null,
+    }, { usable: true, blocker: null, detail: 'Observability Plus was not checked.' }, frameworkSupport);
+    return;
+  }
+
+  if (!frameworkSupport.ok && continueUnsupportedFramework) {
+    log('continuing after unsupported framework blocker because --continue-unsupported-framework was set');
+  }
 
   log('checking Observability Plus configuration…');
   const observabilityPlusConfig = await checkObservabilityPlusConfiguration({
@@ -142,6 +190,9 @@ async function main() {
       observabilityPlusUsable: oplusDiag.usable,
       observabilityPlusBlocker: oplusDiag.blocker,
       observabilityPlusBlockerDetail: oplusDiag.detail,
+      frameworkSupport,
+      frameworkSupportBlocker: frameworkSupport.blocker,
+      frameworkSupportDetail: frameworkSupport.detail,
       plan: {
         plan: 'uncertain',
         reason: 'not collected before Observability Plus blocker confirmation',
@@ -208,8 +259,6 @@ async function main() {
     log(`project config: failed (${projectCfg.error}) — gates that need it will skip`);
   }
 
-  log('detecting codebase stack…');
-  const stack = await detectStack();
   log(`stack: ${stack.framework}@${stack.frameworkVersion ?? '?'} ${stack.hasAppRouter ? 'app-router' : ''}${stack.hasPagesRouter ? ' pages-router' : ''}${stack.orm !== 'none' ? ` orm=${stack.orm}` : ''}`);
 
   // Each query is wrapped; one failure degrades only that metric.
@@ -255,6 +304,9 @@ async function main() {
     observabilityPlusUsable: oplusDiag.usable,
     observabilityPlusBlocker: oplusDiag.blocker,
     observabilityPlusBlockerDetail: oplusDiag.detail,
+    frameworkSupport,
+    frameworkSupportBlocker: frameworkSupport.blocker,
+    frameworkSupportDetail: frameworkSupport.detail,
     plan: planInfo,
     project: projectCfg,
     contract,
@@ -272,7 +324,11 @@ async function main() {
   writeOutput(output, oplusDiag);
 }
 
-function writeOutput(output, oplusDiag) {
+function writeOutput(output, oplusDiag, frameworkSupport = output.frameworkSupport) {
+  if (frameworkSupport?.blocker) {
+    log(`⚠ Framework is not supported for metric-backed route-to-file optimization: ${frameworkSupport.detail}`);
+    log('   The orchestrator should PAUSE and ask whether to continue with a limited platform/scanner audit.');
+  }
   if (!oplusDiag.usable) {
     log(`⚠ Observability Plus is NOT usable on this project: blocker=${oplusDiag.blocker} (${oplusDiag.detail})`);
     log('   The orchestrator should PAUSE and follow the blocker-specific remediation before proceeding.');

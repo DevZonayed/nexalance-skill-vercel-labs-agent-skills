@@ -391,6 +391,40 @@ test('buildBrief: per-kind interpretation hints render for known kinds', () => {
   assert.ok(md.includes(KIND_INTERPRETATION_HINTS.slow_route[0]));
 });
 
+test('buildBrief: cache candidates include cache-policy guidance', () => {
+  const md = buildBrief({
+    candidate: {
+      kind: 'uncached_route',
+      scope: 'route',
+      route: '/api/models',
+      priority: 100,
+      confidence: 0.9,
+      o11ySignal: 'requests=100000,cache=0%,get=100%',
+      question: 'Why is /api/models bypassing the cache?',
+      evidence: {
+        deepDive: {
+          methodDistribution: [{ request_method: 'GET', value: 100000 }],
+          cacheBreakdown: [{ cache_result: 'BYPASS', value: 100000 }],
+        },
+      },
+    },
+    candidateIndex: 0,
+    candidateGroup: 'toLaunch',
+    files: ['app/api/models/route.ts'],
+    signals: {
+      stack: { ...baseStack, cacheComponents: true },
+      codebase: { stack: baseStack, routes: [{ routePath: '/api/models', file: 'app/api/models/route.ts', type: 'route' }] },
+    },
+    citations: stubCitations,
+    generatedAt: null,
+  });
+  assert.match(md, /## Cache-policy decision/);
+  assert.match(md, /Do not default to `no-store`/);
+  assert.match(md, /Whole public GET response/);
+  assert.match(md, /use cache: remote/);
+  assert.match(md, /Runtime Cache/);
+});
+
 test('buildBrief: renders support topics without making them recommendations', () => {
   const md = buildBrief({
     candidate: slowRouteCandidate,

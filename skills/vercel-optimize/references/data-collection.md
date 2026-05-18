@@ -26,9 +26,19 @@ The merged `signals.json` has this top-level shape:
   "projectId": "prj_xxx",
   "orgId": "team_xxx",
   "projectIdSource": "repo.json" | "project.json" | "arg" | "env",
-  "observabilityPlus": true | false,
+  "frameworkSupport": {
+    "ok": true,
+    "status": "supported" | "limited" | "unsupported",
+    "blocker": null | "unsupported_framework",
+    "framework": "next",
+    "label": "Next.js",
+    "detail": "..."
+  },
+  "frameworkSupportBlocker": null | "unsupported_framework",
+  "frameworkSupportDetail": "...",
+  "observabilityPlus": true | false | null,
   "observabilityPlusPreflight": { /* public OpenAPI configuration probe result */ },
-  "observabilityPlusUsable": true | false,
+  "observabilityPlusUsable": true | false | null,
   "observabilityPlusBlocker": null | "no_oplus_probe" | "project_disabled" | "payment_required" | "forbidden" | "daily_quota_exceeded" | "project_not_found" | "not_linked" | "all_failed_other" | "no_traffic",
   "observabilityPlusBlockerDetail": "...",
   "plan": { "plan": "pro" | "enterprise" | "uncertain", "reason": "..." },
@@ -54,6 +64,7 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | Auth | `vercel whoami` | Everything | Exit with "run `vercel login`" |
 | CLI version | `vercel --version` | Everything | Exit with "upgrade to v53+" |
 | Project ID + Org ID | `.vercel/repo.json` (newer) or `.vercel/project.json` (legacy) → `VERCEL_PROJECT_ID` + `VERCEL_ORG_ID` → argv | Everything | Exit with "run `vercel link` or pass projectId" |
+| Framework support | local `package.json` via `detectStack()` + `classifyFrameworkSupport()` | Code-backed route recommendations | Stop before metric fan-out on unsupported frameworks unless the user chooses `--continue-unsupported-framework` |
 | Observability Plus configuration | Public OpenAPI endpoint via `vercel api /v1/observability/manage/configuration/projects?teamId=<orgId>` | All `metrics.*` signals | Stop early when the team lacks Observability Plus or this project is disabled |
 | Observability Plus metrics access | One canary `vercel metrics vercel.request.count --since 14d --limit 1`, then full fan-out only if it succeeds | All `metrics.*` signals | Set `observabilityPlusUsable=false` with blocker detail; emit a minimal blocker document before slower project config / usage collection unless `--continue-without-observability` is passed |
 | Project config | `vercel api /v9/projects/:id?teamId=<orgId>` | Fluid Compute, BotID, Speed Insights, security flags | `{error: "..."}` placeholder; gates that need it skip |
@@ -92,6 +103,7 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 
 | Code | Meaning | Skill behavior |
 |---|---|---|
+| `unsupported_framework` | Detected framework cannot reliably map Vercel route metrics back to source files | Stop before metric fan-out; ask whether to continue with a limited platform/scanner audit |
 | `no_oplus_probe` | Observability Plus not enabled on team | Stop before full metric fan-out; ask whether to enable Observability Plus or run scanner-only |
 | `project_disabled` | Observability Plus enabled for team but disabled for project | Stop before full metric fan-out; ask the user to enable Observability Plus for this project or continue scanner-only |
 | `USAGE_UNAVAILABLE` | `vercel usage` 404 — team has no Costs feature enabled | `usage=null`; cost-tier gates emit lower-priority candidates; billing section of the report shows "unavailable" |

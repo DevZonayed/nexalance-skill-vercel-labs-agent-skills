@@ -85,6 +85,20 @@ test('detectStack: records @vercel/flags packages from package.json', async () =
   }
 });
 
+test('detectStack: recognizes Hono as unsupported framework input', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'vo-hono-stack-'));
+  try {
+    await writeFile(join(root, 'package.json'), JSON.stringify({
+      dependencies: { hono: '^4.7.0' },
+    }), 'utf-8');
+    const stack = await detectStack(root);
+    assert.equal(stack.framework, 'hono');
+    assert.equal(stack.frameworkVersion, '4.7.0');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('detectStack: records Next cacheComponents from next.config', async () => {
   const root = await mkdtemp(join(tmpdir(), 'vo-cache-components-stack-'));
   try {

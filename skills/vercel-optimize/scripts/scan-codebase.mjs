@@ -189,6 +189,21 @@ async function enumerateRoutes(root) {
       });
       continue;
     }
+
+    // Astro endpoint filenames commonly include the response extension
+    // (`feed.xml.ts`, `robots.txt.ts`). Handle these before the generic
+    // `src/pages` rule, which otherwise treats them as page components.
+    m = rel.match(/^src\/pages\/(.*\.(?:xml|json|txt|rss|atom|svg|png|jpg|jpeg|webp))\.(tsx?|jsx?|mjs|cjs)$/);
+    if (m) {
+      const name = normalizeRouteFileStem(m[1]);
+      routes.push({
+        routePath: name === '' ? '/' : '/' + name,
+        file: rel,
+        type: 'route',
+      });
+      continue;
+    }
+
     m = rel.match(/^(?:src\/)?pages\/(.*)\.(tsx?|jsx?)$/);
     if (m) {
       const name = m[1].replace(/\/index$/, '').replace(/^index$/, '');
@@ -197,6 +212,46 @@ async function enumerateRoutes(root) {
         routePath: name === '' ? '/' : '/' + name,
         file: rel,
         type: isApi ? 'route' : 'page',
+      });
+      continue;
+    }
+
+    // Nuxt 3/4 pages. Dynamic segments use the same bracket shape as metrics
+    // (`[id]`, `[...slug]`), so keep them intact for route matching.
+    m = rel.match(/^(?:app\/)?pages\/(.*)\.vue$/);
+    if (m) {
+      const name = normalizeRouteFileStem(m[1]);
+      routes.push({
+        routePath: name === '' ? '/' : '/' + name,
+        file: rel,
+        type: 'page',
+      });
+      continue;
+    }
+
+    // Nuxt server routes: server/api/foo.get.ts -> /api/foo,
+    // server/routes/rss.xml.ts -> /rss.xml.
+    m = rel.match(/^server\/(api|routes)\/(.*)\.(tsx?|jsx?|mjs|cjs)$/);
+    if (m) {
+      const base = m[1] === 'api' ? 'api/' : '';
+      const name = normalizeRouteFileStem(`${base}${m[2]}`);
+      routes.push({
+        routePath: name === '' ? '/' : '/' + name,
+        file: rel,
+        type: 'route',
+      });
+      continue;
+    }
+
+    // Astro pages and endpoints. This is limited framework support, but route
+    // mapping still improves reports when Vercel metrics use user-facing paths.
+    m = rel.match(/^src\/pages\/(.*)\.(astro|tsx?|jsx?|mjs|cjs)$/);
+    if (m) {
+      const name = normalizeRouteFileStem(m[1]);
+      routes.push({
+        routePath: name === '' ? '/' : '/' + name,
+        file: rel,
+        type: m[2] === 'astro' ? 'page' : 'route',
       });
       continue;
     }
@@ -233,6 +288,14 @@ async function enumerateRoutes(root) {
 
 function routeEntryType(name) {
   return name === 'route' ? 'route' : name === 'layout' ? 'layout' : 'page';
+}
+
+function normalizeRouteFileStem(stem) {
+  return String(stem ?? '')
+    .replace(/\/index$/, '')
+    .replace(/^index$/, '')
+    .replace(/\.(?:get|post|put|patch|delete|options|head)$/, '')
+    .replace(/^\/+|\/+$/g, '');
 }
 
 function routeTypeOrder(type) {
