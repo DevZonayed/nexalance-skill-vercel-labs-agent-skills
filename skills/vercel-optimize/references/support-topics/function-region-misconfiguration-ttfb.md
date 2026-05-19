@@ -6,7 +6,7 @@ candidateKinds: ["region_misconfig"]
 frameworks: ["*"]
 scannerPatterns: ["region-pin-in-config"]
 priority: 85
-citations: ["https://vercel.com/docs/functions/regions", "https://vercel.com/docs/functions/configuring-functions/region"]
+citations: ["https://vercel.com/docs/functions/configuring-functions/region", "https://vercel.com/docs/regions"]
 maxBriefChars: 950
 ---
 

@@ -21,7 +21,7 @@ export const metadata = {
   fix:
     "Audit the pinned region against traffic geography (Speed Insights or Web Analytics by country) and data-source location. Consider multi-region if data lives in a fixed location and users are global; consider relocating if users are concentrated in one geography.",
   citations: [
-    'https://vercel.com/docs/functions/regions',
+    'https://vercel.com/docs/functions/configuring-functions/region',
     'https://vercel.com/docs/functions/configuring-functions/region',
   ],
   excludeGlobs: ['node_modules/**', '.next/**', 'dist/**'],

@@ -86,7 +86,7 @@ When a rec spans buckets — e.g., a caching fix that reduces both cost AND late
 
 Internal sort key (never rendered): `priority = currentDimensionCost × fractionReduced × confidence`.
 
-The list of recs the customer sees is sorted by this priority. The platform recommendations section is capped at 3, sorted the same way. Quick wins are extracted separately (`effort=low AND priority > 40`) and rendered as their own section.
+The list of recs the customer sees is sorted by this priority. The platform recommendations section is capped at 3, sorted the same way.
 
 ## The customer-facing report template
 
@@ -98,7 +98,7 @@ The agent renders this as the final output of Step 4. The shape is fixed; the co
 **Stack**: {framework}@{frameworkVersion} | {router} | {orm}
 **Plan**: {plan.plan} ({plan.reason})
 **Period**: {usage.period.from} → {usage.period.to}
-**Observability**: {observabilityPlus ? "Plus enabled — per-route metrics included" : "Not enabled — analysis based on billing + scanner findings"}
+**Observability**: {observabilityPlus ? "Observability Plus enabled — per-route metrics included" : "Not enabled — analysis based on billing + scanner findings"}
 
 ## Cost breakdown
 
@@ -128,7 +128,7 @@ For each high-priority rec, in order:
 |---|---|---|---|---|---|
 
 ### Medium impact
-### Quick wins (low effort, high signal)
+### Low impact
 
 ## Platform recommendations
 
@@ -173,7 +173,7 @@ Common data gaps to call out when the underlying metric returned empty rows:
 - **BotID checks empty.** BotID is disabled — see the `platform_bot_protection` recommendation for the toggle.
 - **Cold-start data near-zero.** Fluid Compute may already be enabled, or the project's traffic pattern keeps warm instances available; the `cold_start` gate evaluates the data but emits no candidate.
 
-The "Not investigated in this run" section is critical. It comes directly from `gated.json` produced by the gate. It tells the user we considered everything; we didn't just pick the easy targets.
+The "Not investigated in this run" section is critical. It comes directly from `gate.json` produced by the gate. It tells the user we considered everything; we didn't just pick the easy targets.
 
 ## Playbook selection matrix
 

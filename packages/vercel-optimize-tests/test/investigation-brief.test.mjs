@@ -250,7 +250,7 @@ test('citationSubset: includes wildcard-version URLs (e.g. Vercel platform docs)
 
 const stubCitations = {
   urls: [
-    { url: 'https://vercel.com/docs/functions/fluid-compute', topic: 'Fluid Compute', appliesTo: ['slow_route'], applicableFrameworks: ['*'] },
+    { url: 'https://vercel.com/docs/fluid-compute', topic: 'Fluid Compute', appliesTo: ['slow_route'], applicableFrameworks: ['*'] },
   ],
   ruleSkillRefs: [
     { skill: 'vercel-react-best-practices', rule: 'async-parallel', topic: 'Promise.all', applicableFrameworks: ['*'] },

@@ -39,7 +39,7 @@ Total scanners: 15.
 
 **Citations:**
 - `https://vercel.com/docs/functions/runtimes/edge-runtime`
-- `https://vercel.com/docs/functions/fluid-compute`
+- `https://vercel.com/docs/fluid-compute`
 
 ---
 
@@ -85,7 +85,7 @@ Total scanners: 15.
 **Fix.** Verify the asset is reachable on the customer-facing hot path. Then choose: (a) compress (convert PNG → AVIF/WebP; transcode MP4 to lower bitrate); (b) host externally (Vercel Blob, S3, or a media CDN with per-asset signed URLs); (c) lazy-load (defer to client-side fetch instead of bundling into initial HTML).
 
 **Citations:**
-- `https://vercel.com/docs/edge-network/bandwidth`
+- `https://vercel.com/docs/manage-cdn-usage`
 - `https://vercel.com/docs/image-optimization`
 
 ---
@@ -164,7 +164,7 @@ Total scanners: 15.
 **Fix.** Audit the pinned region against traffic geography (Speed Insights or Web Analytics by country) and data-source location. Consider multi-region if data lives in a fixed location and users are global; consider relocating if users are concentrated in one geography.
 
 **Citations:**
-- `https://vercel.com/docs/functions/regions`
+- `https://vercel.com/docs/functions/configuring-functions/region`
 - `https://vercel.com/docs/functions/configuring-functions/region`
 
 ---

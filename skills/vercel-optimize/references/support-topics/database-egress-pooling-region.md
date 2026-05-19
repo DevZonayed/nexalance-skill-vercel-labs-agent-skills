@@ -5,7 +5,7 @@ status: active
 candidateKinds: ["slow_route"]
 frameworks: ["*"]
 priority: 60
-citations: ["https://vercel.com/docs/concepts/edge-network/regions", "https://vercel.com/docs/functions/serverless-functions", "https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package", "https://vercel.com/docs/limits/limits-and-quotas"]
+citations: ["https://vercel.com/docs/regions", "https://vercel.com/docs/functions", "https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package", "https://vercel.com/docs/functions/limitations"]
 maxBriefChars: 800
 ---
 

@@ -5,7 +5,7 @@ status: active
 candidateKinds: ["route_errors"]
 frameworks: ["*"]
 priority: 90
-citations: ["https://vercel.com/docs/functions/serverless-functions", "https://vercel.com/docs/limits/limits-and-quotas", "https://vercel.com/docs/cli/inspect"]
+citations: ["https://vercel.com/docs/functions", "https://vercel.com/docs/functions/limitations", "https://vercel.com/docs/cli/inspect"]
 maxBriefChars: 850
 ---
 

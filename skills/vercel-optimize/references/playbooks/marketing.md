@@ -23,7 +23,7 @@ Edge Requests dominate. Image Optimization is high (hero images, illustrations, 
 
 ## Cross-references
 
-- `https://vercel.com/docs/security/bot-protection` — almost always the right platform rec
+- `https://vercel.com/docs/bot-management` — almost always the right platform rec
 - `https://vercel.com/docs/incremental-static-regeneration` — for CMS-driven sections
 - `https://nextjs.org/docs/app/api-reference/components/image` — hero/illustration optimization
 - `vercel-react-best-practices:bundle-defer-third-party` — defer analytics/pixels

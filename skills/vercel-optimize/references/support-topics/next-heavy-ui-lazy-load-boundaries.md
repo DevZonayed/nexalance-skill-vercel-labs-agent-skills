@@ -6,7 +6,7 @@ candidateKinds: ["cwv_poor"]
 frameworks: ["next@*"]
 metrics: ["LCP", "INP"]
 priority: 82
-citations: ["https://nextjs.org/docs/app/guides/lazy-loading", "https://nextjs.org/docs/app/api-reference/functions/dynamic", "https://web.dev/articles/optimize-inp"]
+citations: ["https://nextjs.org/docs/app/guides/lazy-loading", "https://web.dev/articles/optimize-inp"]
 maxBriefChars: 850
 ---
 

@@ -408,7 +408,7 @@ test('applySanitizersBatch: partitions kept vs dropped with reasons', async () =
   const recs = [
     { what: 'A', citations: ['https://vercel.com/docs/caching/cdn-cache'] },
     { what: 'B', citations: [] },
-    { what: 'C', citations: ['https://vercel.com/docs/functions/fluid-compute'] },
+    { what: 'C', citations: ['https://vercel.com/docs/fluid-compute'] },
   ];
   const r = await applySanitizersBatch(recs, { framework: 'next', version: '15.4.10' });
   assert.equal(r.kept.length, 2);

@@ -27,4 +27,4 @@ Edge Requests dominate (catalog browsing, image asset traffic) → Image Optimiz
 - `vercel-react-best-practices:async-suspense-boundaries` — stream the checkout shell, fill cart drawer later
 - `vercel-react-best-practices:bundle-defer-third-party` — defer analytics (GA, Mixpanel) post-hydration
 - `https://nextjs.org/docs/app/api-reference/components/image` — for the catalog image fix
-- `https://vercel.com/docs/security/bot-protection` — for bot traffic on search/product routes
+- `https://vercel.com/docs/bot-management` — for bot traffic on search/product routes

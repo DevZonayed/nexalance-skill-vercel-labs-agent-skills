@@ -38,7 +38,7 @@ export const metadata = {
     'Either (a) drop the `export const runtime = \'edge\'` so the route runs on Node (default in 2026), or (b) replace the heavy import with an edge-compatible alternative. For DB: use @neondatabase/serverless or @planetscale/database instead of pg/mysql2. For image: do the work in a Node route handler. For auth signing: use jose (Web Crypto) instead of jsonwebtoken.',
   citations: [
     'https://vercel.com/docs/functions/runtimes/edge-runtime',
-    'https://vercel.com/docs/functions/fluid-compute',
+    'https://vercel.com/docs/fluid-compute',
   ],
   excludeGlobs: ['node_modules/**', '.next/**', 'dist/**', '__tests__/**', '**/*.test.*', '**/*.spec.*'],
   includeGlobs: ['**/*.{ts,tsx,js,mjs}'],

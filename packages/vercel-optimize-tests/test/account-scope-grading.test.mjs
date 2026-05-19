@@ -17,8 +17,8 @@ const botidRec = {
   scope: 'account',
   o11ySignal: 'edge_cost=97445,bot_protection=disabled,bot_fdt_pct=49%,requests=15.4M',
   citations: [
-    'https://vercel.com/docs/security/bot-protection',
-    'https://vercel.com/docs/security/botid',
+    'https://vercel.com/docs/bot-management',
+    'https://vercel.com/docs/botid',
   ],
   verify: 'Watch Fast Data Transfer GB and bot_category breakdown in the firewall events drain after 24h.',
   impactTier: 'high',

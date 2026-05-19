@@ -5,12 +5,12 @@ status: active
 candidateKinds: ["uncached_route"]
 frameworks: ["*"]
 priority: 65
-citations: ["https://vercel.com/docs/edge-network/bandwidth", "https://vercel.com/docs/caching/cdn-cache"]
+citations: ["https://vercel.com/docs/manage-cdn-usage", "https://vercel.com/docs/caching/cdn-cache"]
 maxBriefChars: 900
 ---
 
 ## Investigation Brief
-When uncached routes carry high bandwidth, check payload shape before recommending only cache headers. FDT meters **post-compression** bytes — compare gzipped/brotli sizes to the signal, not raw JSON. ISR cache compressed since Jan 2025; a stale-deploy project still pays uncompressed rates until next deploy.
+When uncached routes carry high bandwidth, check payload shape before recommending only cache headers. Fast Data Transfer includes the bytes transferred by requests and responses; compare compressed response sizes to the signal, not raw JSON.
 
 ## Evidence To Check
 Use `bandwidthByCache`, response size, and source serialization. Look for unbounded JSON, large embedded objects, static files through functions, missing pagination.

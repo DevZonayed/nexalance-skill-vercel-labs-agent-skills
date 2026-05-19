@@ -5,7 +5,7 @@ status: active
 candidateKinds: ["platform_bot_protection"]
 frameworks: ["*"]
 priority: 90
-citations: ["https://vercel.com/docs/security/bot-protection", "https://vercel.com/docs/vercel-firewall/vercel-waf/managed-rulesets", "https://vercel.com/docs/vercel-firewall/vercel-waf/custom-rules", "https://vercel.com/docs/botid"]
+citations: ["https://vercel.com/docs/bot-management", "https://vercel.com/docs/vercel-firewall/vercel-waf/managed-rulesets", "https://vercel.com/docs/vercel-firewall/vercel-waf/custom-rules", "https://vercel.com/docs/botid"]
 maxBriefChars: 800
 ---
 

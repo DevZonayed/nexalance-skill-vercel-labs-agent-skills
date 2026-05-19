@@ -22,7 +22,7 @@ export const metadata = {
   fix:
     'Verify the asset is reachable on the customer-facing hot path. Then choose: (a) compress (convert PNG → AVIF/WebP; transcode MP4 to lower bitrate); (b) host externally (Vercel Blob, S3, or a media CDN with per-asset signed URLs); (c) lazy-load (defer to client-side fetch instead of bundling into initial HTML).',
   citations: [
-    'https://vercel.com/docs/edge-network/bandwidth',
+    'https://vercel.com/docs/manage-cdn-usage',
     'https://vercel.com/docs/image-optimization',
   ],
   excludeGlobs: ['node_modules/**', '.next/**', 'dist/**', '__tests__/**'],

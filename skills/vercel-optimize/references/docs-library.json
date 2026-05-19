@@ -1,7 +1,7 @@
 {
   "$schema": "Curated documentation allow-list for the vercel-optimize skill. Entries are version-aware via applicableFrameworks (semver). The recommender prompt receives only the subset valid for the user's stack. Citations outside this allow-list are stripped by the unknown-citation sanitizer.",
   "version": "1.1.0",
-  "lastVerified": "2026-05-15",
+  "lastVerified": "2026-05-19",
   "schemaVersion": "1.0",
   "applicableFrameworksSyntax": "Semver-style. '*' = any framework. 'next@*' = any Next.js. 'next@14' = Next 14.x. 'next@>=15.0.0' = Next 15+. Multiple via '||': 'next@14 || next@>=15.0.0'.",
   "urls": [
@@ -24,7 +24,7 @@
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/functions/fluid-compute",
+      "url": "https://vercel.com/docs/fluid-compute",
       "topic": "Fluid Compute — reduced cold starts, active CPU pricing, function instance reuse, memory right-sizing",
       "appliesTo": ["cold_start", "platform_fluid_compute", "slow_route", "oversized_memory"],
       "applicableFrameworks": ["*"]
@@ -78,7 +78,7 @@
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/functions/serverless-functions",
+      "url": "https://vercel.com/docs/functions",
       "topic": "Vercel Functions lifecycle — regions, memory, max duration, runtimes",
       "appliesTo": ["slow_route", "cold_start", "route_errors"],
       "applicableFrameworks": ["*"]
@@ -156,7 +156,7 @@
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/functions/regions",
+      "url": "https://vercel.com/docs/regions",
       "topic": "Vercel Functions regions — single vs multi-region, defaults, latency tradeoffs",
       "appliesTo": ["region_misconfig"],
       "applicableFrameworks": ["*"]
@@ -168,14 +168,14 @@
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/observability/anomaly-detection",
-      "topic": "Anomaly Detection (GA) — per-metric anomaly alerts on routes/status/usage; Slack/email/webhook destinations",
+      "url": "https://vercel.com/docs/alerts",
+      "topic": "Alerts — per-metric alerting on routes/status/usage with supported destinations",
       "appliesTo": ["observability_events_attribution", "usage_spike_triage"],
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/pricing/spend-management",
-      "topic": "Spend Management — usage thresholds + email alerts; goes silent after threshold is hit",
+      "url": "https://vercel.com/docs/spend-management",
+      "topic": "Spend Management — usage thresholds, notifications, and project pause behavior",
       "appliesTo": ["usage_spike_triage"],
       "applicableFrameworks": ["*"]
     },
@@ -198,7 +198,7 @@
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/edge-network/bandwidth",
+      "url": "https://vercel.com/docs/manage-cdn-usage",
       "topic": "Vercel Edge Network bandwidth — Fast Data Transfer, included quotas, overage pricing",
       "appliesTo": ["large_static_asset", "uncached_route"],
       "applicableFrameworks": ["*"]
@@ -210,7 +210,7 @@
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/security/bot-protection",
+      "url": "https://vercel.com/docs/bot-management",
       "topic": "Vercel Bot Protection — enabling, false-positive handling, billing implications",
       "appliesTo": ["platform_bot_protection"],
       "applicableFrameworks": ["*"]
@@ -222,7 +222,7 @@
       "applicableFrameworks": ["*"]
     },
     {
-      "url": "https://vercel.com/docs/limits/limits-and-quotas",
+      "url": "https://vercel.com/docs/functions/limitations",
       "topic": "Platform limits — function payload size, max duration, regional caps",
       "appliesTo": ["route_errors", "slow_route"],
       "applicableFrameworks": ["*"]
@@ -372,15 +372,9 @@
       "applicableFrameworks": ["next@*"]
     },
     {
-      "url": "https://nextjs.org/docs/app/api-reference/functions/dynamic",
+      "url": "https://nextjs.org/docs/app/guides/lazy-loading",
       "topic": "next/dynamic — lazy-load heavy client components, SSR opt-out",
       "appliesTo": ["bundle_candidate", "slow_route", "cwv_poor"],
-      "applicableFrameworks": ["next@*"]
-    },
-    {
-      "url": "https://nextjs.org/docs/app/guides/lazy-loading",
-      "topic": "Next.js lazy loading — defer Client Components and imported libraries with dynamic imports",
-      "appliesTo": ["cwv_poor"],
       "applicableFrameworks": ["next@*"]
     },
     {

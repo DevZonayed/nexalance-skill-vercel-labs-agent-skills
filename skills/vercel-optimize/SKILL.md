@@ -30,9 +30,9 @@ This skill is built from field-tested Vercel optimization patterns. The architec
 
 ## Prerequisites
 
-- `vercel` CLI v53 or higher (`npm i -g vercel@latest`). The skill refuses older versions.
+- Vercel CLI with `vercel metrics`, `vercel usage`, and `vercel contract` support (`npm i -g vercel@latest`). The skill refuses versions below v53, its compatibility floor.
 - Authenticated: `vercel login`.
-- Linked project: `vercel link`, or set `VERCEL_PROJECT_ID` env var, or pass the project ID as the first argument to `collect-signals.mjs`.
+- Linked project directory: `vercel link`. `VERCEL_PROJECT_ID` can resolve project config, but it does not replace directory linkage for `vercel metrics`.
 - Node.js 20+ on the host running the skill (built-in `node:test`, `fs.readdir({recursive})`, no installed deps required).
 - For metric-backed route ranking: **Observability Plus** on the team.
 
@@ -47,7 +47,7 @@ The skill detects the framework from `package.json`. Current coverage:
 | Next.js (App Router) | supported | ✓ | ✓ (Next-shaped + generic) | ✓ (application-profile) | 18 next-specific + wildcard | Best supported |
 | Next.js (Pages Router) | supported | ✓ | ✓ (most) | ✓ (saas/api-service) | same | Recs scoped to Pages Router idioms when detected |
 | SvelteKit | supported | ✓ | ✓ (`sveltekit-prerender-missing`) | ✓ (`sveltekit.md`) | 10 sveltekit URLs | Routes from `src/routes/+page.svelte`, `+page.server.ts`, `+server.ts` |
-| Nuxt | supported | ✓ | generic | — | 3 nuxt URLs | Routes from `pages/**` and `server/api/**` / `server/routes/**` |
+| Nuxt | supported | ✓ | generic | — | 3 nuxt URLs | Route mapping plus generic/platform checks; fewer framework-specific recommendations |
 | Astro | limited | ✓ | generic | — | 3 astro URLs | Metrics + generic route mapping; fewer framework-specific playbooks |
 | Hono / Remix / unknown | blocked by default | — | generic only if user continues | — | wildcard only | Continue only when the user accepts a limited platform/scanner audit |
 
@@ -90,7 +90,7 @@ node scripts/collect-signals.mjs             # no project linked, no project id 
 | 2.3 Investigate launched | `reconciled-investigation.json` | raw investigation outputs | [references/doctrine.md](references/doctrine.md) |
 | 2.4 Collect outputs | raw investigation outputs + manifest | `recommendations.json` | [references/recommendations.md](references/recommendations.md) |
 | 3. Verify + grade recs | `recommendations.json` | `verify.json` | [references/recommendations.md](references/recommendations.md), [references/verification.md](references/verification.md) |
-| 4. Score and report | `verify.json` + `gated.json` | Markdown report | [references/scoring.md](references/scoring.md) |
+| 4. Score and report | `verify.json` + `gate.json` | Markdown report | [references/scoring.md](references/scoring.md) |
 
 ## Step 1 — Collect signals
 
@@ -106,7 +106,7 @@ node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$RUN_
 The script handles:
 - Preflight (CLI version, auth, project ID resolution)
 - Framework support preflight from `package.json`. Unsupported frameworks stop before metric fan-out unless the user chooses `--continue-unsupported-framework`.
-- Observability Plus configuration preflight via the public `vercel api` OpenAPI surface, followed by a one-query metrics access check before full metrics fan-out
+- Observability Plus configuration preflight through the Vercel CLI/API surface, followed by a one-query metrics access check before full metrics fan-out. `vercel api` is beta, so the metrics probe remains the source of truth.
 - Fast blocker output: when Observability Plus is unavailable, it writes a minimal `signals.json` and stops before slower project config / usage collection unless `--continue-without-observability` is passed
 - `vercel api /v9/projects/<id>` for project config
 - `vercel contract` for plan inference (commitments[].category: Spend=Pro, Usage=Enterprise)
@@ -122,7 +122,7 @@ Output: one JSON document to stdout matching the schema in `references/data-coll
 node scripts/scan-codebase.mjs <repo-root>
 ```
 
-Outputs `{stack, routes, findings}`. The findings come from nine deterministic scanners (image, force-dynamic, middleware matcher, cache headers, use-client cascade, max-age without s-maxage, dynamic APIs in pages, source maps in production, deep Prisma includes).
+Outputs `{stack, routes, findings}`. The findings come from the deterministic scanner registry documented in [references/scanner-patterns.md](references/scanner-patterns.md).
 
 ### 1.3 Merge into a single `signals.json`
 
@@ -217,7 +217,7 @@ The gate is pure JS, no LLM. Output:
   "platform": [ /* account-scope recs (Fluid, Bot Protection) */ ],
   "gated": [ /* candidates that failed thresholds, hit the budget cap, OR were folded into a sibling via route canonicalization */ ],
   "budget": { "maxCandidates": 6, "source": "default", "selection": "diverse-default" },
-  "gateVersion": "1.4.0",
+  "gateVersion": "1.7.0",
   "appliedAt": "..."
 }
 ```
@@ -533,7 +533,7 @@ Use `--debug-out debug.json` when developing the skill and you need internal ver
 
 - Cost breakdown — from `vercel usage` when present, else observability-derived GB-hr ranking
 - Highest-impact recommendations — top 5 recs with readable metric labels + what-to-do + impact + citations
-- Recommendations — partitioned High / Medium / Low + Quick wins table
+- Recommendations — partitioned High / Medium / Low
 - Detailed recommendations — full rec body (why / fix / before / after / verify / citations)
 - Platform recommendations — capped at 3
 - Observations from investigation — non-recommendation findings like deployment regressions, error storms, and metric mismatches
@@ -547,7 +547,6 @@ Use `--debug-out debug.json` when developing the skill and you need internal ver
 
 - Drop recs with `quality.overall < 0.55`.
 - Cap platform recs at 3.
-- Extract quickWins (`effort=low AND priority > 40`).
 - Dedupe overlapping recommendations before rendering. The customer-visible recommendation count is the report's **Coverage** line or `debug.json.renderedRecommendationCount`, not raw `verify.json.recsGraded.length`.
 - Hold back recommendation records whose `candidateRef` is absent from the current run's launched/platform candidates. This catches stale temp files and gate-output mismatches.
 - Hold back observations that make unsupported framework-causal claims, especially `notFound()` + `'use cache'` 5xx claims without runtime logs or official framework evidence.
@@ -601,11 +600,11 @@ Internal priority: `currentDimensionCost × fractionReduced × confidence`. Used
 
 ### 4.4 Render the report
 
-Follow the template in [references/scoring.md](references/scoring.md#the-customer-facing-report-template). The "Not investigated in this run" section pulls directly from `gated.json`. This earns trust by showing every signal we considered and the reason it was held back.
+Follow the template in [references/scoring.md](references/scoring.md#the-customer-facing-report-template). The "Not investigated in this run" section pulls directly from `gate.json`. This earns trust by showing every signal we considered and the reason it was held back.
 
 ## Output template
 
-Always end with a structured markdown report. The full template is in [references/scoring.md](references/scoring.md). Top-level shape:
+The full Markdown report uses the template in [references/scoring.md](references/scoring.md). After rendering, send only `final-message.json.body`; the report path points to the full evidence. Top-level report shape:
 
 ```
 # Vercel Optimization Report — <project>
@@ -617,7 +616,6 @@ Always end with a structured markdown report. The full template is in [reference
 ## Recommendations (sorted by priority)
    ### High impact
    ### Medium impact
-   ### Quick wins
 ## Platform recommendations (capped at 3)
 ## Observations from investigation
 ## Investigated, no change recommended

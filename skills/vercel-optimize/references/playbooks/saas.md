@@ -28,4 +28,4 @@ Function Duration dominates (every dashboard request runs the function fully —
 - `vercel-react-best-practices:async-suspense-boundaries` — stream the dashboard shell
 - `vercel-react-best-practices:server-after-nonblocking` — defer audit/analytics writes (Next 15+)
 - `vercel-react-best-practices:client-swr-dedup` — replace polling with SWR
-- `https://vercel.com/docs/functions/fluid-compute` — when cold starts hurt
+- `https://vercel.com/docs/fluid-compute` — when cold starts hurt

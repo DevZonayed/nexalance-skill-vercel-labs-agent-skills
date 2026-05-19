@@ -37,7 +37,7 @@ The merged `signals.json` has this top-level shape:
   "frameworkSupportBlocker": null | "unsupported_framework",
   "frameworkSupportDetail": "...",
   "observabilityPlus": true | false | null,
-  "observabilityPlusPreflight": { /* public OpenAPI configuration probe result */ },
+  "observabilityPlusPreflight": { /* CLI/API configuration probe result */ },
   "observabilityPlusUsable": true | false | null,
   "observabilityPlusBlocker": null | "no_oplus_probe" | "project_disabled" | "payment_required" | "forbidden" | "daily_quota_exceeded" | "project_not_found" | "not_linked" | "all_failed_other" | "no_traffic",
   "observabilityPlusBlockerDetail": "...",
@@ -62,14 +62,14 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | Signal | CLI command | Required for | Fallback when missing |
 |---|---|---|---|
 | Auth | `vercel whoami` | Everything | Exit with "run `vercel login`" |
-| CLI version | `vercel --version` | Everything | Exit with "upgrade to v53+" |
+| CLI version | `vercel --version` | Everything | Exit with "upgrade to v53+" — v53 is the skill's compatibility floor |
 | Project ID + Org ID | `.vercel/repo.json` (newer) or `.vercel/project.json` (legacy) → `VERCEL_PROJECT_ID` + `VERCEL_ORG_ID` → argv | Everything | Exit with "run `vercel link` or pass projectId" |
 | Framework support | local `package.json` via `detectStack()` + `classifyFrameworkSupport()` | Code-backed route recommendations | Stop before metric fan-out on unsupported frameworks unless the user chooses `--continue-unsupported-framework` |
-| Observability Plus configuration | Public OpenAPI endpoint via `vercel api /v1/observability/manage/configuration/projects?teamId=<orgId>` | All `metrics.*` signals | Stop early when the team lacks Observability Plus or this project is disabled |
+| Observability Plus configuration | Vercel CLI/API probe plus one metric access check | All `metrics.*` signals | Stop early when the team lacks Observability Plus or this project is disabled |
 | Observability Plus metrics access | One canary `vercel metrics vercel.request.count --since 14d --limit 1`, then full fan-out only if it succeeds | All `metrics.*` signals | Set `observabilityPlusUsable=false` with blocker detail; emit a minimal blocker document before slower project config / usage collection unless `--continue-without-observability` is passed |
 | Project config | `vercel api /v9/projects/:id?teamId=<orgId>` | Fluid Compute, BotID, Speed Insights, security flags | `{error: "..."}` placeholder; gates that need it skip |
 | Plan tier | `vercel contract --format json --scope <orgId>` → `inferPlan()` | Cost-context framing only | `plan="uncertain"`; cost magnitudes still computed from `usage.services[].billedCost` |
-| Billing usage | `vercel usage --format json --from <14d> --to <today> --group-by project --scope <orgId>` | Cost magnitude framing, billing-driven candidates | `null` + `usageError` set; cost magnitudes degrade to "small" by default |
+| Billing usage | `vercel usage --format json --from <14d> --to <today>` with best-effort project grouping when supported by the installed CLI | Cost magnitude framing, billing-driven candidates | `null` + `usageError` set; cost magnitudes degrade to "small" by default |
 | Stack | local `package.json` + dir scan | Version-aware citation filtering, scanner gating | "unknown" framework → all framework-specific citations filtered |
 | `metrics.fnDurationP95ByRoute` | `vercel metrics vercel.function_invocation.function_duration_ms -a p95 --group-by route --since 14d` | `slow_route`, `platform_fluid_compute` gates | `{ok:false}`; gate emits no candidates |
 | `metrics.requestsByRouteCache` | `vercel metrics vercel.request.count --group-by route --group-by cache_result --since 14d` | `uncached_route`, traffic-total computation | `{ok:false}` |
@@ -90,7 +90,7 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | `metrics.isrReadsByRoute` | `vercel metrics vercel.isr_operation.read_units -a sum --group-by route --since 14d` | `isr_overrevalidation` gate (denominator) | `{ok:false}` |
 | `metrics.isrWritesByRoute` | `vercel metrics vercel.isr_operation.write_units -a sum --group-by route --since 14d` | `isr_overrevalidation` gate (numerator) | `{ok:false}` |
 
-**ISR read:write ratio caveat.** `isrReadsByRoute` exposes the **origin-tier** read count only. CDN-tier reads (regional cache hits that never reach the ISR origin) are not separately surfaced today and frequently dominate total read volume — Porsche PDP and Nectar Sleep audits both showed CDN reads at 71% / 80%+ of total. Before flagging "writes > reads" as inverted, the gate and report must (a) acknowledge CDN-tier reads aren't included, (b) corroborate with `requestsByRouteCache` `cache_result=HIT` share before alarming. A high origin-write rate alone does not imply pathological over-revalidation if the CDN is absorbing the steady-state read traffic.
+**ISR read:write ratio caveat.** `isrReadsByRoute` exposes the **origin-tier** read count only. CDN-tier reads (regional cache hits that never reach the ISR origin) are not separately surfaced today and can dominate total read volume. Before flagging "writes > reads" as inverted, the gate and report must (a) acknowledge CDN-tier reads aren't included, (b) corroborate with `requestsByRouteCache` `cache_result=HIT` share before alarming. A high origin-write rate alone does not imply pathological over-revalidation if the CDN is absorbing the steady-state read traffic.
 | `metrics.imageCount`, `imageByHost`, `imageSourceBytes` | `vercel metrics vercel.image_transformation.*` | Image-optimization narrative | `{ok:false}` |
 | `metrics.cwvLcpByRoute`, `cwvInpByRoute`, `cwvClsByRoute`, `cwvTtfbByRoute`, `cwvCount`, `cwvCountByRoute` | `vercel metrics vercel.speed_insights_metric.*` (`p75` for vitals, `sum` for counts) `--since 14d` | `cwv_poor` gate | Empty when Speed Insights not enabled on the project — gate stays dormant |
 | `metrics.firewallByAction` | `vercel metrics vercel.firewall_action.count -a sum --group-by waf_action --since 14d` | Bot-protection narrative; shows existing managed rule activity | `{ok:false}` |

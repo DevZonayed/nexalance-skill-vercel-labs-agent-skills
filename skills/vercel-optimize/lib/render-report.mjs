@@ -316,7 +316,7 @@ function renderMetadataLine(stack, plan, usage, oplus) {
     ? `${usage.period.from ?? '?'} → ${usage.period.to ?? '?'}`
     : '(unavailable)';
   const oplusLabel = oplus
-    ? 'Plus enabled — per-route metrics included'
+    ? 'Observability Plus enabled — per-route metrics included'
     : 'Not enabled — analysis based on billing + scanner findings';
   // Plan-inference reason is debug detail — only surface when plan is uncertain.
   const planLabel = plan.plan === 'uncertain'

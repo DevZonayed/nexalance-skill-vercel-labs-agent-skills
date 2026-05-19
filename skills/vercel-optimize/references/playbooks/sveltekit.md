@@ -72,4 +72,4 @@ Vercel image service Next.js uses).
 - `https://kit.svelte.dev/docs/form-actions` — server-side form handling
 - `https://kit.svelte.dev/docs/state-management` — request-scoped state
 - `https://vercel.com/docs/incremental-static-regeneration` — ISR on Vercel
-- `https://vercel.com/docs/functions/fluid-compute` — Fluid Compute (framework-agnostic)
+- `https://vercel.com/docs/fluid-compute` — Fluid Compute (framework-agnostic)

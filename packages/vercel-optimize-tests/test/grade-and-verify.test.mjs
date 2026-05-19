@@ -346,7 +346,7 @@ test('extractClaims + verifyClaim: cached notFound 5xx claims need Next-specific
     what: "Move notFound() calls out of the 'use cache' scope to stop 500s.",
     why: "The file declares 'use cache' and calls notFound(); notFound() inside a cached function surfaces as 500.",
     affectedFiles: ['app/docs/messages/[slug]/page.tsx'],
-    citations: ['https://vercel.com/docs/functions/serverless-functions'],
+    citations: ['https://vercel.com/docs/functions'],
   };
   const claim = extractClaims(rec, { framework: 'next', version: '16.3.0-canary.11' })
     .find((c) => c.type === 'next_cached_not_found_causal_support');

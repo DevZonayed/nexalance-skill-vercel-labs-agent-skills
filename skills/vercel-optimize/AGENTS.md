@@ -9,7 +9,7 @@ Do not use it for projects that are not deployed on Vercel, greenfield projects 
 ## Requirements
 
 - Node.js 20+
-- Vercel CLI v53+
+- Vercel CLI with `vercel metrics`, `vercel usage`, and `vercel contract` support; v53+ is this skill's compatibility floor
 - Authenticated Vercel CLI session
 - Linked Vercel project, or `VERCEL_PROJECT_ID`
 - Observability Plus for per-route metric analysis

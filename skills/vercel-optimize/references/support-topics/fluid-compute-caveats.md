@@ -5,12 +5,12 @@ status: active
 candidateKinds: ["platform_fluid_compute", "cold_start"]
 frameworks: ["*"]
 priority: 80
-citations: ["https://vercel.com/docs/functions/fluid-compute"]
+citations: ["https://vercel.com/docs/fluid-compute"]
 maxBriefChars: 900
 ---
 
 ## Investigation Brief
-Fluid compute is a project-level lever. Use it when the setting is off and metrics show cold-start or warm-instance reuse pressure. Per-instance concurrency cap = 256 (p99.99 ≈ 210 today); size in-memory caches and pools against that ceiling.
+Fluid compute is a project-level lever. Use it when the setting is off and metrics show cold-start or warm-instance reuse pressure. Fluid can handle multiple invocations in one function instance; avoid per-request state in module scope.
 
 ## Evidence To Check
 Check project facts, `startTypeSplit`, cold-vs-warm latency, and routes carrying the cold-start share. When enabling Fluid, audit module-state hazards Fluid surfaces (not creates): module-scoped mutable state, lazy singletons holding per-user data, globals keyed on per-request inputs.
