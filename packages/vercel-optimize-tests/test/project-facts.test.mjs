@@ -1,4 +1,4 @@
-// Regression: live example-dashboard emitted "Verify Fluid Compute is on" rec because
+// Regression: a live project emitted "Verify Fluid Compute is on" rec because
 // the renderer didn't surface signals.project.defaultResourceConfig.fluid.
 // Fix renders project config in Strengths + guards the gate from firing
 // when project config failed to load.
@@ -48,7 +48,7 @@ test('renderReport: warns when memory tier is Performance (might be over-provisi
 });
 
 test('renderReport: does NOT claim Fluid is on when project config failed (auth scope mismatch)', () => {
-  // Live example-dashboard: PROJECT_NOT_FOUND from team-scoped API. Renderer must not fabricate.
+  // Live failure mode: PROJECT_NOT_FOUND from team-scoped API. Renderer must not fabricate.
   const signals = {
     ...baseSignals,
     project: { error: 'PROJECT_NOT_FOUND' },

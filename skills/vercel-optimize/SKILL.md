@@ -89,6 +89,7 @@ Required actions:
 - `no_traffic`: tell the user route metrics are sparse; continue only if they accept limited output.
 - `payment_required` or `no_oplus_probe`: render [references/observability-plus.md](references/observability-plus.md) verbatim and ask.
 - `project_disabled`: tell the user to enable Observability Plus for the project or accept a limited audit.
+- `daily_quota_exceeded`: stop and tell the user the Observability query quota is exhausted; retry after the next UTC midnight reset, or ask whether to continue with a limited code-only audit.
 - `not_linked`: link the app directory, then rerun Step 1. If app path and project are known:
 
 ```bash
@@ -174,12 +175,12 @@ List the work:
 node scripts/prepare-investigation-brief.mjs "$RUN_DIR/signals.json" "$RUN_DIR/reconciled-investigation.json" --list > "$RUN_DIR/briefs-manifest.json"
 ```
 
-Generate briefs:
+Generate one brief for every entry in `briefs-manifest.json.briefs`. The `group` can be `toLaunch` or `platform`; do not generate only `toLaunch` briefs.
 
 ```bash
 mkdir -p "$RUN_DIR/briefs" "$RUN_DIR/sub-agent-outputs"
 node scripts/prepare-investigation-brief.mjs "$RUN_DIR/signals.json" "$RUN_DIR/reconciled-investigation.json" \
-  --group toLaunch --index <n> --out "$RUN_DIR/briefs/toLaunch-<n>.md"
+  --group <brief.group> --index <brief.index> --out "$RUN_DIR/briefs/<brief.group>-<brief.index>.md"
 ```
 
 Use `briefs-manifest.json.briefs[].label` for visible worker names, for example `Low cache-hit route on /docs/llm-digest/[...slug]`, not `toLaunch-7`.

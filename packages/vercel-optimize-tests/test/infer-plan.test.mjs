@@ -1,5 +1,5 @@
 // Two-tier plan inference: commitment-category first, then usage>$0 → Pro
-// (closes the live example-dashboard gap where commitments=[] but team billed Pro PAYG).
+// (closes the live gap where commitments=[] but the team has billed usage).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,12 +22,12 @@ test('inferPlan: commitment with alternate field names (commitmentCategory)', ()
   assert.equal(r.plan, 'pro');
 });
 
-test('inferPlan: commitments=[] + usage > $0 → Pro pay-as-you-go (the example-dashboard case)', () => {
-  // Live failure reproduced: contract.commitments=[] but $1804/mo billed.
-  const r = inferPlan({ commitments: [] }, { usageTotalCost: 1804.59 });
+test('inferPlan: commitments=[] + usage > $0 → Pro pay-as-you-go', () => {
+  // Live failure reproduced: contract.commitments=[] but the team had billed usage.
+  const r = inferPlan({ commitments: [] }, { usageTotalCost: 1800 });
   assert.equal(r.plan, 'pro');
   assert.match(r.reason, /pay-as-you-go/);
-  assert.match(r.reason, /1804\.59/);
+  assert.match(r.reason, /1800/);
 });
 
 test('inferPlan: commitments=[] + usage=$0 → uncertain (Hobby or unbilled Pro)', () => {

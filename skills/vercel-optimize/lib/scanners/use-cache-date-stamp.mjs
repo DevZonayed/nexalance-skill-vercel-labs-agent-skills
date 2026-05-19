@@ -4,9 +4,9 @@
 //
 // Triggers when a file contains the `'use cache'` directive AND uses `new Date(`,
 // `Date.now(`, or `Math.random(` outside client-only hooks (useEffect / useCallback /
-// useMemo). Field benchmark: Under Armour dropped ISR writes 50-90% by replacing
-// module-scope `new Date().getFullYear()` with a build-time `buildYear` constant
-// and removing dates passed as `'use cache'` function arguments.
+// useMemo). Replacing module-scope `new Date().getFullYear()` with a build-time
+// `buildYear` constant, and removing dates passed as `'use cache'` function
+// arguments, prevents repeated writes when the rendered output is otherwise stable.
 
 import { lineOf } from '../util.mjs';
 

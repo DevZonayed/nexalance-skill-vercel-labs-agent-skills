@@ -13,7 +13,7 @@ test('oplus diag: probe failed → no_oplus_probe', () => {
 });
 
 test('oplus diag: queries all returned payment_required → payment_required blocker', () => {
-  // Live example-dashboard failure: schema probe OK but every per-route query is payment_required.
+  // Live failure mode: schema probe OK but every per-route query is payment_required.
   const metrics = {
     fnDurationP95ByRoute: { ok: false, code: 'payment_required' },
     requestsByRouteCache: { ok: false, code: 'payment_required' },

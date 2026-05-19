@@ -11,4 +11,4 @@ transfer-encoding: chunked
 x-ratelimit-limit: 60
 x-ratelimit-remaining: 59
 x-ratelimit-reset: 1778646572
-x-vercel-id: sfo1::w45r5-1778646511413-d7c8c3cb26cb
+x-vercel-id: [REDACTED]

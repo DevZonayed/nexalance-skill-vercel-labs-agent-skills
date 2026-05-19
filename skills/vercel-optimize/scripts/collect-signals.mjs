@@ -244,7 +244,7 @@ async function main() {
         log(`usage: filtered to project — ~$${usageTotalCost.toFixed(2)} (team-wide ~$${usageTeamTotal.toFixed(2)}; unattributed ~$${filterResult.unattributedTotal.toFixed(2)})`);
       } else {
         usageTotalCost = usageTeamTotal;
-        log(`usage: ~$${usageTotalCost.toFixed(2)} billed across services (team-wide — no per-project usage rows matched ${project.projectId}; report will label this team-wide)`);
+        log(`usage: ~$${usageTotalCost.toFixed(2)} billed across services (team-wide — no per-project usage rows matched the linked project; report will label this team-wide)`);
       }
     }
   } else {

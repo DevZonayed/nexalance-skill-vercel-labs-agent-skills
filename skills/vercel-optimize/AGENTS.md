@@ -9,9 +9,9 @@ Do not use it for projects that are not deployed on Vercel, greenfield projects 
 ## Requirements
 
 - Node.js 20+
-- Vercel CLI with `vercel metrics`, `vercel usage`, and `vercel contract` support; v53+ is this skill's compatibility floor
+- Vercel CLI with `vercel metrics`, `vercel usage`, `vercel contract`, and `vercel api` support; v53+ is this skill's compatibility floor
 - Authenticated Vercel CLI session
-- Linked Vercel project, or `VERCEL_PROJECT_ID`
+- Linked Vercel project directory (`vercel link`) for route metrics. `VERCEL_PROJECT_ID` can help resolve project config, but it does not replace directory linkage for `vercel metrics`.
 - Observability Plus for per-route metric analysis
 
 ## Procedure

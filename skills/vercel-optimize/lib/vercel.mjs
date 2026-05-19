@@ -141,8 +141,10 @@ export function redactSensitiveText(value) {
   return String(value ?? '')
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]{12,}/gi, '$1 [REDACTED]')
     .replace(/\b(Authorization:\s*)[^\r\n]+/gi, '$1[REDACTED]')
+    .replace(/\b(x-vercel-id:\s*)[^\r\n]+/gi, '$1[REDACTED]')
     .replace(/\b(VERCEL_TOKEN|TURBO_TOKEN|NPM_TOKEN|NODE_AUTH_TOKEN|GITHUB_TOKEN)=("[^"]+"|'[^']+'|[^\s"'`]+)/g, '$1=[REDACTED]')
     .replace(/(--token(?:=|\s+))("[^"]+"|'[^']+'|[^\s"'`]+)/gi, '$1[REDACTED]')
+    .replace(/\b(prj|team)_[A-Za-z0-9]{8,}\b/g, '$1_[REDACTED]')
     .replace(/("token"\s*:\s*")[^"]{8,}(")/gi, '$1[REDACTED]$2');
 }
 

@@ -51,11 +51,11 @@ async function main() {
     process.exit(2);
   }
   if (merged.projectId && link.projectId !== merged.projectId) {
-    console.error(`[deep-dive] FATAL: cwd .vercel/ links project ${link.projectId}, but merged.json was collected for ${merged.projectId}.`);
-    console.error(`         Re-run with --cwd <dir-linked-to-${merged.projectId}>.`);
+    console.error('[deep-dive] FATAL: cwd .vercel/ links a different project than merged.json.');
+    console.error('         Re-run with --cwd <dir-linked-to-the-collected-project>.');
     process.exit(2);
   }
-  log(`cwd link OK (project ${link.projectId}, source ${link.source})`);
+  log(`cwd link OK (source ${link.source})`);
 
   const scope = merged.orgId || undefined;
   const toLaunch = Array.isArray(gate.toLaunch) ? gate.toLaunch : [];

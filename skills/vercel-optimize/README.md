@@ -19,7 +19,7 @@ Manual install: copy `skills/vercel-optimize` into `.agents/skills/vercel-optimi
 ## Requirements
 
 - Node.js 20+
-- Vercel CLI with `vercel metrics`, `vercel usage`, and `vercel contract` support (`npm i -g vercel@latest`). The skill enforces v53+ as its compatibility floor.
+- Vercel CLI with `vercel metrics`, `vercel usage`, `vercel contract`, and `vercel api` support (`npm i -g vercel@latest`). The skill enforces v53+ as its compatibility floor.
 - Authenticated Vercel CLI session (`vercel login`)
 - Linked Vercel project directory (`vercel link`) for route metrics. `VERCEL_PROJECT_ID` can resolve project config, but it does not replace directory linkage for `vercel metrics`.
 - Observability Plus for metric-backed route ranking

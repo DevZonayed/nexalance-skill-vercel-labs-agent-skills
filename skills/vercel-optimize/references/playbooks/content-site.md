@@ -1,6 +1,6 @@
 # Content site
 
-Documentation, blogs, knowledge bases, marketing-adjacent content with mostly static pages. Authoring may be CMS-driven (Sanity, Contentful, Strapi) or markdown-in-repo.
+Documentation, blogs, knowledge bases, marketing-adjacent content with mostly static pages. Authoring may be headless-CMS-driven or markdown-in-repo.
 
 ## Typical billing shape
 

@@ -7,9 +7,9 @@
 //   no-ignore-step  — repo has turbo.json and no repo-declared ignoreCommand;
 //                     verify Vercel's skip-unaffected project setting before recommending one
 //
-// Field benchmark: Netic's 10-project monorepo rebuilt every project on every commit because
-// `TURBO_FORCE=true` was set. Build-skip settings and right-sized build machines
-// can reduce Build Minutes when the project is rebuilding unchanged work.
+// This pattern has caused full-monorepo rebuilds on every commit. Build-skip
+// settings and right-sized build machines can reduce Build Minutes when the
+// project is rebuilding unchanged work.
 
 export const metadata = {
   id: 'turbo-force-bypass',
