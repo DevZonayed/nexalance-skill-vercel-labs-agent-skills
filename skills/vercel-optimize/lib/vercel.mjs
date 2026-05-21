@@ -675,6 +675,9 @@ export async function detectStack(cwd = process.cwd()) {
     '@vercel/flags/sveltekit',
     '@vercel/flags/nuxt',
   ].filter((name) => deps[name]);
+  const workflowPackages = Object.keys(deps)
+    .filter((name) => name === 'workflow' || name.startsWith('@workflow/'))
+    .sort();
 
   const isMonorepo =
     !!pkg.workspaces ||
@@ -693,6 +696,8 @@ export async function detectStack(cwd = process.cwd()) {
     rootDirectory: null,
     hasVercelFlagsPackage: vercelFlagsPackages.length > 0,
     vercelFlagsPackages,
+    hasWorkflowPackage: workflowPackages.length > 0,
+    workflowPackages,
   };
 }
 
@@ -702,6 +707,7 @@ function baselineStack() {
     hasAppRouter: false, hasPagesRouter: false, cacheComponents: null, typescript: false,
     orm: 'none', isMonorepo: false, rootDirectory: null,
     hasVercelFlagsPackage: false, vercelFlagsPackages: [],
+    hasWorkflowPackage: false, workflowPackages: [],
   };
 }
 

@@ -338,6 +338,22 @@ test('renderReport: public gated reasons avoid raw budget internals', () => {
   assert.doesNotMatch(md, /=all/);
 });
 
+test('renderReport: public gated reasons avoid hard-gate internals', () => {
+  const md = renderReport({
+    recommendations: [],
+    gated: [
+      {
+        kind: 'slow_route',
+        route: '/.well-known/workflow/v1/step',
+        gatedReason: 'hardGated: Vercel Workflow runtime endpoint; long-running step/flow requests are expected orchestration, not an app-route optimization target',
+      },
+    ],
+    signals: baseSignals,
+  });
+  assert.match(md, /Vercel Workflow runtime endpoint; long-running step\/flow requests are expected orchestration/);
+  assert.doesNotMatch(md, /hardGated/);
+});
+
 test('renderReport: partitions recs by impactTier into High / Medium / Low', () => {
   const md = renderReport({
     recommendations: [

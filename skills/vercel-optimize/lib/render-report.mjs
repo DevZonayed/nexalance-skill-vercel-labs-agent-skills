@@ -569,6 +569,7 @@ function splitInvestigationOutcomes(abstentions) {
 
 function publicGatedReason(reason) {
   return formatPublicText(String(reason))
+    .replace(/\bhardGated:\s*/gi, '')
     .replace(/skippedByBudget\s*\(max-candidates=([^);]+)(?:;[^)]*)?\)/i, 'left for a larger run (max candidates: $1)')
     .replace(/skippedByBudget\b/gi, 'left for a larger run')
     .replace(/\s*;\s*raise with --max-candidates N or =all/gi, '')
