@@ -45,7 +45,7 @@ The merged `signals.json` has this top-level shape:
   "project": { /* /v9/projects/:id response, scoped to orgId via ?teamId */ },
   "contract": { "context": "...", "commitments": [], "totalCommitments": 0 },
   "usage": { /* vercel usage --format json --breakdown daily, or null */ },
-  "usageError": null | "USAGE_UNAVAILABLE" | "EXIT_<n>",
+  "usageError": null | "USAGE_UNAVAILABLE" | "USAGE_CONTEXT_MISMATCH" | "NOT_COLLECTED_OBSERVABILITY_BLOCKED" | "NOT_COLLECTED_UNSUPPORTED_FRAMEWORK" | "EXIT_<n>" | "UNKNOWN",
   "stack": { /* framework + version + router + ORM + monorepo */ },
   "codebase": { /* scan-codebase output: stack + routes + findings */ },
   "metrics": { /* per-metric query results (only when observabilityPlus=true) */ },
@@ -69,7 +69,7 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | Observability Plus metrics access | One canary `vercel metrics vercel.request.count --since 14d --limit 1`, then full fan-out only if it succeeds | All `metrics.*` signals | Set `observabilityPlusUsable=false` with blocker detail; emit a minimal blocker document before slower project config / usage collection unless `--continue-without-observability` is passed |
 | Project config | `vercel api /v9/projects/:id?teamId=<orgId>` | Fluid Compute, BotID, Speed Insights, security flags | `{error: "..."}` placeholder; gates that need it skip |
 | Plan tier | `vercel contract --format json --scope <orgId>` → `inferPlan()` | Cost-context framing only | `plan="uncertain"`; cost magnitudes still computed from `usage.services[].billedCost` |
-| Billing usage | `vercel usage --format json --from <14d> --to <today>` with best-effort project grouping when supported by the installed CLI | Cost magnitude framing, billing-driven candidates | `null` + `usageError` set; cost magnitudes degrade to "small" by default |
+| Billing usage | `vercel usage --format json --from <14d> --to <today>` with best-effort project grouping when supported by the installed CLI | Cost magnitude framing, billing-driven candidates | `null` + `usageError` set when queried and unavailable; `NOT_COLLECTED_*` when a preflight stop happened before billing collection |
 | Stack | local `package.json` + dir scan | Version-aware citation filtering, scanner gating | "unknown" framework → all framework-specific citations filtered |
 | `metrics.fnDurationP95ByRoute` | `vercel metrics vercel.function_invocation.function_duration_ms -a p95 --group-by route --since 14d` | `slow_route`, `platform_fluid_compute` gates | `{ok:false}`; gate emits no candidates |
 | `metrics.requestsByRouteCache` | `vercel metrics vercel.request.count --group-by route --group-by cache_result --since 14d` | `uncached_route`, traffic-total computation | `{ok:false}` |
@@ -92,7 +92,7 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 
 **ISR read:write ratio caveat.** `isrReadsByRoute` exposes the **origin-tier** read count only. CDN-tier reads (regional cache hits that never reach the ISR origin) are not separately surfaced today and can dominate total read volume. Before flagging "writes > reads" as inverted, the gate and report must (a) acknowledge CDN-tier reads aren't included, (b) corroborate with `requestsByRouteCache` `cache_result=HIT` share before alarming. A high origin-write rate alone does not imply pathological over-revalidation if the CDN is absorbing the steady-state read traffic.
 | `metrics.imageCount`, `imageByHost`, `imageSourceBytes` | `vercel metrics vercel.image_transformation.*` | Image-optimization narrative | `{ok:false}` |
-| `metrics.cwvLcpByRoute`, `cwvInpByRoute`, `cwvClsByRoute`, `cwvTtfbByRoute`, `cwvCount`, `cwvCountByRoute` | `vercel metrics vercel.speed_insights_metric.*` (`p75` for vitals, `sum` for counts) `--since 14d` | `cwv_poor` gate | Empty when Speed Insights not enabled on the project — gate stays dormant |
+| `metrics.cwvLcpByRoute`, `cwvInpByRoute`, `cwvClsByRoute`, `cwvTtfbByRoute`, `cwvCount`, `cwvCountByRoute` | `vercel metrics vercel.speed_insights_metric.*` (`p75` for vitals, `sum` for counts) `--since 14d` | `cwv_poor` gate | Empty when no Speed Insights measurements are returned for the 14-day window — gate stays dormant; do not infer disabled vs no traffic unless another signal proves it |
 | `metrics.firewallByAction` | `vercel metrics vercel.firewall_action.count -a sum --group-by waf_action --since 14d` | Bot-protection narrative; shows existing managed rule activity | `{ok:false}` |
 | `metrics.botIdChecks` | `vercel metrics vercel.bot_id_check.count -a sum --since 14d` | Confirms whether BotID is actively running | `{ok:false}` |
 | `metrics.externalApiCount`, `externalApiBytes` | `vercel metrics vercel.external_api_request.*` grouped by `origin_hostname` | External-dependency cost narrative | `{ok:false}` |
@@ -107,7 +107,7 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | `no_oplus_probe` | Observability Plus not enabled on team | Stop before full metric fan-out; ask whether to enable Observability Plus or run scanner-only |
 | `project_disabled` | Observability Plus enabled for team but disabled for project | Stop before full metric fan-out; ask the user to enable Observability Plus for this project or continue scanner-only |
 | `daily_quota_exceeded` | Observability Plus query quota is exhausted for the day | Stop before full metric fan-out; tell the user to retry after the next UTC midnight reset or ask whether to continue scanner-only |
-| `USAGE_UNAVAILABLE` | `vercel usage` 404 — team has no Costs feature enabled | `usage=null`; cost-tier gates emit lower-priority candidates; billing section of the report shows "unavailable" |
+| `USAGE_UNAVAILABLE` | `vercel usage` returned no Costs payload after billing usage was actually queried | `usage=null`; cost-tier gates emit lower-priority candidates; billing section of the report shows the exact usage error |
 | `PROJECT_NOT_FOUND` | `vercel api /v9/projects/<id>` 404 (typically wrong scope) | `project={error}`; platform gates that depend on project config skip; report flags the data gap |
 | `invalid_filter_dimension` / `invalid_dimension` | Metric query used a dimension the metric doesn't support | Metric returns `{ok:false, code, allowedValues}`; consumer can introspect and adjust |
 | `NOT_LINKED` | The app directory is not linked in the way `vercel metrics` requires | Run `vercel link --yes --project <project-name-or-id> --cwd <app-dir>`; add `--team <team-id-or-slug>` when known. Passing only `VERCEL_PROJECT_ID` is not enough for route metrics if cwd is unlinked |
@@ -188,7 +188,7 @@ Calling without `?teamId=` returns 404 when the project belongs to a team other 
 
 ### `vercel usage --format json`
 
-May return `Error: Costs not found (404)` on teams without the Costs feature. Treat as `USAGE_UNAVAILABLE` and degrade — the skill still produces a useful report from metrics + scanner.
+May return `Error: Costs not found (404)`. Treat that queried error as `USAGE_UNAVAILABLE` and degrade — the skill can still produce a useful report from metrics + scanner. Do not use this explanation when `usageError` is `NOT_COLLECTED_OBSERVABILITY_BLOCKED` or another `NOT_COLLECTED_*` value; those mean the audit stopped before `vercel usage` ran.
 
 ## Why we avoid stderr grep
 
