@@ -104,7 +104,7 @@ export async function resolveCommandScope(project = {}) {
       source: 'missing-org-scope',
       required: true,
       error: 'PROJECT_SCOPE_UNRESOLVED',
-      detail: 'The project was resolved without an org/team owner, so the collector cannot prove which Vercel scope to query.',
+      detail: 'The project was resolved without an owner account, so the collector cannot prove which Vercel scope to query.',
     };
   }
 
@@ -293,6 +293,15 @@ export async function checkObservabilityPlusConfiguration({ orgId, projectId } =
       detail: 'No team ID was available for the Observability Plus configuration preflight.',
     };
   }
+  if (String(orgId).startsWith('usr_')) {
+    return {
+      ok: false,
+      source: 'observability-configuration-api',
+      access: null,
+      blocker: 'unknown',
+      detail: 'The Observability Plus team configuration preflight is not available for a user-owned project; falling back to the scoped metrics probe.',
+    };
+  }
   const qs = `?teamId=${encodeURIComponent(orgId)}`;
   const r = await runVercelJson(['api', `/v1/observability/manage/configuration/projects${qs}`]);
   return classifyObservabilityPlusConfiguration(r, { projectId });
@@ -390,9 +399,12 @@ export async function queryMetric(metricId, opts = {}) {
   );
 }
 
-// `vercel api /v9/projects/<id>` 404s when project's team ≠ user's currentTeam — always pass `?teamId=<orgId>`.
+// Team-owned projects need `?teamId=<orgId>` to avoid current-team drift. User-
+// owned projects use the authenticated user context and should not pass teamId.
 export async function getProjectConfig(projectId, orgId) {
-  const qs = orgId ? `?teamId=${encodeURIComponent(orgId)}` : '';
+  const qs = orgId && !String(orgId).startsWith('usr_')
+    ? `?teamId=${encodeURIComponent(orgId)}`
+    : '';
   const r = await runVercelJson(['api', `/v9/projects/${projectId}${qs}`]);
   return r.ok ? r.data : { error: r.code, stderr: r.stderr };
 }

@@ -73,6 +73,12 @@ async function main() {
     console.error('         Re-run collect-signals.mjs with the current skill so deep-dive queries use the same team as the broad pass.');
     process.exit(2);
   }
+  const commandAccountId = commandScope.teamId ?? commandScope.userId ?? null;
+  if (commandAccountId && link.orgId && link.orgId !== commandAccountId) {
+    console.error('[deep-dive] FATAL: cwd .vercel/ links the project to a different Vercel scope than commandScope.');
+    console.error('         Re-run with --cwd <dir-linked-to-the-collected-project>, or rerun collect-signals.mjs from the intended app directory.');
+    process.exit(2);
+  }
   const scope = commandScope.cliScope || undefined;
   log(`command scope resolved (source=${commandScope.source}; scoped=${scope ? 'yes' : 'no'})`);
 

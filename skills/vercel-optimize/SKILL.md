@@ -74,7 +74,7 @@ node scripts/merge-signals.mjs "$RUN_DIR/vercel-signals.json" "$RUN_DIR/codebase
 
 Collection details, schemas, metric IDs, and degradation behavior live in [references/data-collection.md](references/data-collection.md). The metric registry is [lib/queries.mjs](lib/queries.mjs); keep all queries on the shared 14-day window.
 
-`collect-signals.mjs` resolves the linked project team to `commandScope.cliScope`; downstream scripts reuse that scope for every Vercel CLI command that accepts `--scope`. Do not run `vercel usage`, `vercel metrics`, or `vercel contract` manually without the same scope; unscoped usage can report the user's personal organization while route metrics come from the team project.
+`collect-signals.mjs` resolves the linked project owner to `commandScope.cliScope`; downstream scripts reuse that scope for every Vercel CLI command that accepts `--scope`. Do not run `vercel usage`, `vercel metrics`, or `vercel contract` manually without the same scope; unscoped usage can report the user's personal organization while route metrics come from the team project.
 
 If project or scope resolution is ambiguous, stop and ask the user which Vercel project and team/personal scope they want audited. Do not infer the intended scope from the current `vercel whoami` team, and do not proceed with metrics, usage, or contract collection until the link or `VERCEL_PROJECT_ID` + `VERCEL_ORG_ID` identifies the intended account.
 
@@ -89,7 +89,7 @@ jq '{frameworkSupportBlocker, observabilityPlus, observabilityPlusUsable, observ
 Required actions:
 
 - `frameworkSupportBlocker === "unsupported_framework"`: use the unsupported-framework prompt above.
-- `PROJECT_SCOPE_UNRESOLVED` or `SCOPE_UNRESOLVED`: stop and ask which Vercel team/personal scope owns the project. Rerun after `vercel link --yes --project <project-name-or-id> --team <team-slug>` or after setting both `VERCEL_PROJECT_ID` and `VERCEL_ORG_ID`.
+- `PROJECT_SCOPE_UNRESOLVED` or `SCOPE_UNRESOLVED`: stop and ask which Vercel team/personal scope owns the project. For team projects, rerun after `vercel link --yes --project <project-name-or-id> --team <team-slug>`; for personal projects, rerun after linking under the intended user account or after setting both `VERCEL_PROJECT_ID` and `VERCEL_ORG_ID`.
 - `observabilityPlusBlocker === null`: continue.
 - `no_traffic`: tell the user route metrics are sparse; continue only if they accept limited output.
 - `payment_required` or `no_oplus_probe`: render [references/observability-plus.md](references/observability-plus.md) verbatim and ask.

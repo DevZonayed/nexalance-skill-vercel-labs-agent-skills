@@ -243,6 +243,115 @@ process.exit(66);
   }
 });
 
+test('collect-signals: user-owned projects use username scope without teamId query params', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'vo-user-scope-'));
+  const bin = join(scratch, 'bin');
+  try {
+    await mkdir(bin, { recursive: true });
+    await mkdir(join(scratch, '.vercel'), { recursive: true });
+    await writeFile(join(scratch, 'package.json'), JSON.stringify({
+      dependencies: { next: '^15.3.0' },
+    }), 'utf-8');
+    await writeFile(join(scratch, '.vercel', 'project.json'), JSON.stringify({
+      projectId: 'prj_user',
+      orgId: 'usr_personal',
+    }), 'utf-8');
+    const fakeVercel = join(bin, 'vercel');
+    await writeFile(fakeVercel, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+function json(value, code = 0) {
+  process.stdout.write(JSON.stringify(value, null, 2) + '\\n');
+  process.exit(code);
+}
+function requireScope(expected) {
+  const i = args.indexOf('--scope');
+  if (i === -1 || args[i + 1] !== expected || args.includes('usr_personal')) {
+    process.stderr.write('missing expected scope ' + expected + ': ' + args.join(' ') + '\\n');
+    process.exit(67);
+  }
+}
+if (args[0] === '--version') {
+  process.stdout.write('54.1.0\\n');
+  process.exit(0);
+}
+if (args[0] === 'whoami' && args[1] === '--format') {
+  json({
+    user: { id: 'usr_personal', username: 'personal-user', billing: { plan: 'pro' } },
+  });
+}
+if (args[0] === 'whoami') {
+  process.stdout.write('personal-user\\n');
+  process.exit(0);
+}
+if (args[0] === 'metrics' && args[1] === 'schema') {
+  requireScope('personal-user');
+  json({ error: { code: 'OPLUS_REQUIRED', message: 'Observability Plus is not enabled' } }, 1);
+}
+if (args[0] === 'api') {
+  const path = args[1];
+  if (path.startsWith('/v1/observability/manage/configuration/projects')) {
+    process.stderr.write('unexpected team Observability configuration probe for user-owned project\\n');
+    process.exit(68);
+  }
+  if (path.startsWith('/v9/projects/prj_user?teamId=')) {
+    process.stderr.write('unexpected user project teamId query: ' + path + '\\n');
+    process.exit(69);
+  }
+  if (path === '/v9/projects/prj_user') {
+    json({ id: 'prj_user', name: 'personal-site' });
+  }
+  if (path === '/v2/user') {
+    json({ user: { username: 'personal-user', billing: { plan: 'pro' } } });
+  }
+}
+if (args[0] === 'contract') {
+  requireScope('personal-user');
+  json({ context: 'personal-user', commitments: [], totalCommitments: 0 });
+}
+if (args[0] === 'usage') {
+  requireScope('personal-user');
+  json({
+    context: 'personal-user',
+    groupBy: {
+      dimension: 'project',
+      data: [{
+        projectId: 'prj_user',
+        name: 'personal-site',
+        services: [{ name: 'Function Invocations', billedCost: 4 }],
+        totals: { billedCost: 4 },
+      }],
+    },
+    services: [{ name: 'Function Invocations', billedCost: 4 }],
+    totals: { billedCost: 4 },
+  });
+}
+process.stderr.write('unexpected vercel call: ' + args.join(' ') + '\\n');
+process.exit(66);
+`, 'utf-8');
+    await chmod(fakeVercel, 0o755);
+
+    const { stdout, stderr } = await exec('node', [COLLECT, '--continue-without-observability'], {
+      cwd: scratch,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    const out = JSON.parse(stdout);
+    assert.equal(out.commandScope.cliScope, 'personal-user');
+    assert.equal(out.commandScope.source, 'whoami-user');
+    assert.equal(out.usageScope, 'project');
+    assert.equal(out.usageError, null);
+    assert.equal(out.usage.project.projectId, 'prj_user');
+    assert.equal(out.project.id, 'prj_user');
+    assert.equal(out.plan.plan, 'pro');
+    assert.match(out.observabilityPlusPreflight.detail, /user-owned project/);
+    assert.doesNotMatch(stderr, /unexpected vercel call/);
+    assert.doesNotMatch(stderr, /missing expected scope/);
+    assert.doesNotMatch(stderr, /teamId query/);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
 test('collect-signals: missing orgId stops before scoped Vercel calls', async () => {
   const scratch = await mkdtemp(join(tmpdir(), 'vo-missing-scope-'));
   const bin = join(scratch, 'bin');
