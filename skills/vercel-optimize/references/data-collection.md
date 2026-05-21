@@ -26,6 +26,13 @@ The merged `signals.json` has this top-level shape:
   "projectId": "prj_xxx",
   "orgId": "team_xxx",
   "projectIdSource": "repo.json" | "project.json" | "arg" | "env",
+  "commandScope": {
+    "ok": true,
+    "cliScope": "team-slug-or-username",
+    "source": "team-api" | "whoami-current-team" | "whoami-user" | "linked-org-scope" | "current-user",
+    "required": true,
+    "detail": "..."
+  },
   "frameworkSupport": {
     "ok": true,
     "status": "supported" | "limited" | "unsupported",
@@ -55,6 +62,8 @@ The merged `signals.json` has this top-level shape:
 
 All metric queries use the same `timeWindow` constant (`14d`) — defined as `TIME_WINDOW` in [lib/queries.mjs](../lib/queries.mjs) and covered by the repo test suite. Mixing windows silently produces incompatible rollups; never pin a per-query `since`.
 
+All Vercel CLI commands that accept scope must use `commandScope.cliScope` (`--scope <team-slug-or-username>`). Linked project files often contain a raw `team_...` ID, but several CLI subcommands silently fall back to the current team when `--scope` receives that ID. `collect-signals.mjs` resolves raw team IDs to slugs before running `vercel metrics`, `vercel usage`, or `vercel contract`; `deep-dive.mjs` reuses the same scope for follow-up metric queries. If the slug cannot be resolved, stop instead of running scoped commands unscoped or with a raw team ID.
+
 Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schemaVersion` is required when any consumed path is renamed or removed.
 
 ## Per-signal source matrix
@@ -65,11 +74,12 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | CLI version | `vercel --version` | Everything | Exit with "upgrade to v53+" — v53 is the skill's compatibility floor |
 | Project ID + Org ID | `.vercel/repo.json` (newer) or `.vercel/project.json` (legacy) → `VERCEL_PROJECT_ID` + `VERCEL_ORG_ID` → argv | Everything | Exit with "run `vercel link` or pass projectId" |
 | Framework support | local `package.json` via `detectStack()` + `classifyFrameworkSupport()` | Code-backed route recommendations | Stop before metric fan-out on unsupported frameworks unless the user chooses `--continue-unsupported-framework` |
+| CLI command scope | `vercel whoami --format json`, then `vercel api /v2/teams/:orgId` when a linked `team_...` ID must be converted to a slug | Keeps `vercel metrics`, `vercel usage`, and `vercel contract` on the linked project's team instead of the user's current/personal scope | `SCOPE_UNRESOLVED`; stop and ask the user to `vercel switch <team>` or re-link with `vercel link --yes --project <project> --team <team-slug>` |
 | Observability Plus configuration | Vercel CLI/API probe plus one metric access check | All `metrics.*` signals | Stop early when the team lacks Observability Plus or this project is disabled |
 | Observability Plus metrics access | One canary `vercel metrics vercel.request.count --since 14d --limit 1`, then full fan-out only if it succeeds | All `metrics.*` signals | Set `observabilityPlusUsable=false` with blocker detail; emit a minimal blocker document before slower project config / usage collection unless `--continue-without-observability` is passed |
 | Project config | `vercel api /v9/projects/:id?teamId=<orgId>` | Fluid Compute, BotID, Speed Insights, security flags | `{error: "..."}` placeholder; gates that need it skip |
-| Plan tier | `vercel api /v2/teams/:orgId` (or `/v2/user` for user-owned projects) → `billing.plan`, then `vercel contract --format json --scope <orgId>` fallback → `inferPlan()` | Cost-context framing only | `plan="uncertain"`; cost magnitudes still computed from `usage.services[].billedCost` |
-| Billing usage | `vercel usage --format json --from <14d> --to <today>` with best-effort project grouping when supported by the installed CLI | Cost magnitude framing, billing-driven candidates | `null` + `usageError` set when queried and unavailable; `NOT_COLLECTED_*` when a preflight stop happened before billing collection |
+| Plan tier | `vercel api /v2/teams/:orgId` (or `/v2/user` for user-owned projects) → `billing.plan`, then scoped `vercel contract --format json` fallback → `inferPlan()` | Cost-context framing only | `plan="uncertain"`; cost magnitudes still computed from `usage.services[].billedCost` |
+| Billing usage | Scoped `vercel usage --format json --from <14d> --to <today>` with best-effort project grouping when supported by the installed CLI | Cost magnitude framing, billing-driven candidates | `null` + `usageError` set when queried and unavailable; `NOT_COLLECTED_*` when a preflight stop happened before billing collection |
 | Stack | local `package.json` + dir scan | Version-aware citation filtering, scanner gating | "unknown" framework → all framework-specific citations filtered |
 | `metrics.fnDurationP95ByRoute` | `vercel metrics vercel.function_invocation.function_duration_ms -a p95 --group-by route --since 14d` | `slow_route`, `platform_fluid_compute` gates | `{ok:false}`; gate emits no candidates |
 | `metrics.requestsByRouteCache` | `vercel metrics vercel.request.count --group-by route --group-by cache_result --since 14d` | `uncached_route`, traffic-total computation | `{ok:false}` |
@@ -104,6 +114,7 @@ Downstream consumers reference `signals.<field>` paths verbatim. Bumping `schema
 | Code | Meaning | Skill behavior |
 |---|---|---|
 | `unsupported_framework` | Detected framework cannot reliably map Vercel route metrics back to source files | Stop before metric fan-out; ask whether to continue with a limited platform/scanner audit |
+| `SCOPE_UNRESOLVED` | The linked project belongs to a specific team/user, but the collector could not resolve a CLI-safe `--scope` value | Stop before `vercel metrics`, `vercel usage`, or `vercel contract`; ask the user to switch/re-link with the correct team |
 | `no_oplus_probe` | Observability Plus not enabled on team | Stop before full metric fan-out; ask whether to enable Observability Plus or run scanner-only |
 | `project_disabled` | Observability Plus enabled for team but disabled for project | Stop before full metric fan-out; ask the user to enable Observability Plus for this project or continue scanner-only |
 | `daily_quota_exceeded` | Observability Plus query quota is exhausted for the day | Stop before full metric fan-out; tell the user to retry after the next UTC midnight reset or ask whether to continue scanner-only |

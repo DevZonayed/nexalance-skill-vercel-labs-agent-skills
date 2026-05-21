@@ -40,6 +40,11 @@ export async function checkAuth() {
   }
 }
 
+export async function getCliIdentity() {
+  const r = await runVercelJson(['whoami', '--format', 'json']);
+  return r.ok ? r.data : null;
+}
+
 // Supports newer `.vercel/repo.json` (multi-project) + legacy `.vercel/project.json` (single-project).
 export async function readProjectJson(cwd = process.cwd()) {
   try {
@@ -80,6 +85,104 @@ export async function resolveProjectId(explicit, cwd = process.cwd()) {
     };
   }
   return await readProjectJson(cwd);
+}
+
+export async function resolveCommandScope(project = {}) {
+  const orgId = project?.orgId ?? null;
+  const identity = await getCliIdentity();
+  const currentTeam = identity?.team ?? null;
+
+  if (!orgId) {
+    return {
+      ok: true,
+      cliScope: currentTeam?.slug ?? null,
+      source: currentTeam?.slug ? 'whoami-current-team' : 'current-user',
+      required: false,
+      detail: currentTeam?.slug
+        ? 'Using the current CLI team as the command scope because the project link has no orgId.'
+        : 'Using the current CLI user scope because the project link has no orgId and no current team was reported.',
+    };
+  }
+
+  if (String(orgId).startsWith('team_')) {
+    if (currentTeam?.id === orgId && currentTeam?.slug) {
+      return {
+        ok: true,
+        cliScope: currentTeam.slug,
+        source: 'whoami-current-team',
+        required: true,
+        teamId: orgId,
+        detail: 'Resolved linked team ID to the current CLI team slug.',
+      };
+    }
+
+    const team = await getTeamInfo(orgId);
+    if (team.ok && team.slug) {
+      return {
+        ok: true,
+        cliScope: team.slug,
+        source: 'team-api',
+        required: true,
+        teamId: orgId,
+        detail: 'Resolved linked team ID to a Vercel CLI scope slug.',
+      };
+    }
+
+    return {
+      ok: false,
+      cliScope: null,
+      source: 'team-api',
+      required: true,
+      teamId: orgId,
+      error: team.error ?? 'TEAM_SCOPE_UNRESOLVED',
+      detail: 'Could not resolve the linked team ID to a Vercel CLI scope slug.',
+    };
+  }
+
+  if (String(orgId).startsWith('usr_')) {
+    const user = identity?.user ?? identity ?? {};
+    const userId = user.id ?? identity?.id ?? null;
+    const username = user.username ?? identity?.username ?? null;
+    if ((!userId || userId === orgId) && username) {
+      return {
+        ok: true,
+        cliScope: username,
+        source: 'whoami-user',
+        required: true,
+        userId: orgId,
+        detail: 'Resolved linked user ID to a Vercel CLI username scope.',
+      };
+    }
+    return {
+      ok: false,
+      cliScope: null,
+      source: 'whoami-user',
+      required: true,
+      userId: orgId,
+      error: 'USER_SCOPE_UNRESOLVED',
+      detail: 'Could not resolve the linked user ID to the authenticated Vercel username.',
+    };
+  }
+
+  return {
+    ok: true,
+    cliScope: orgId,
+    source: 'linked-org-scope',
+    required: true,
+    detail: 'Using the linked org value as the Vercel CLI scope.',
+  };
+}
+
+async function getTeamInfo(teamIdOrSlug) {
+  const r = await runVercelJson(['api', `/v2/teams/${encodeURIComponent(teamIdOrSlug)}`]);
+  if (!r.ok) return { ok: false, error: r.code ?? 'UNKNOWN' };
+  const team = r.data?.team ?? r.data ?? {};
+  return {
+    ok: true,
+    id: team.id ?? null,
+    slug: team.slug ?? null,
+    name: team.name ?? null,
+  };
 }
 
 // Some commands emit `{error: {...}}` on stdout AND exit non-zero — parse stdout first; embedded `error` is the most reliable signal.
@@ -400,8 +503,8 @@ export async function getAccountPlan(scope) {
 }
 
 async function getCurrentTeamId() {
-  const r = await runVercelJson(['whoami', '--format', 'json']);
-  return r.ok ? (r.data?.team?.id ?? null) : null;
+  const identity = await getCliIdentity();
+  return identity?.team?.id ?? null;
 }
 
 async function getBillingPlanFromPath(path, source) {
@@ -598,11 +701,12 @@ async function pathExists(p) {
   try { await access(p); return true; } catch { return false; }
 }
 
-// `--scope <teamId>` is buggy on several subcommands (silently falls back to currentTeam) — only pass slugs.
+// `--scope <teamId>` is buggy on several subcommands (silently falls back to
+// currentTeam). Resolve raw account IDs to slugs/usernames before scoped calls.
 function scopedArgs(args, scope) {
   if (!scope) return args;
-  if (typeof scope === 'string' && /^team_[A-Za-z0-9]+$/.test(scope)) {
-    return args;
+  if (typeof scope === 'string' && /^(team|usr)_/.test(scope)) {
+    throw new Error('RAW_ID_SCOPE_UNRESOLVED: resolve the linked org/user ID to a CLI scope slug before running Vercel commands.');
   }
   return [...args, '--scope', scope];
 }

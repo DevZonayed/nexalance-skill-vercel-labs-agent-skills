@@ -97,10 +97,19 @@ if (args[0] === 'api') {
     json({ id: 'team_hobby', slug: 'fixture', billing: { plan: 'hobby' } });
   }
 }
+function requireScope(expected) {
+  const i = args.indexOf('--scope');
+  if (i === -1 || args[i + 1] !== expected) {
+    process.stderr.write('missing expected scope ' + expected + ': ' + args.join(' ') + '\\n');
+    process.exit(67);
+  }
+}
 if (args[0] === 'contract') {
+  requireScope('fixture');
   json({ context: 'fixture', commitments: [], totalCommitments: 0 });
 }
 if (args[0] === 'usage') {
+  requireScope('fixture');
   json({
     context: 'fixture',
     groupBy: { dimension: 'project', data: [] },
@@ -121,9 +130,114 @@ process.exit(66);
     const out = JSON.parse(stdout);
     assert.equal(out.plan.plan, 'hobby');
     assert.match(out.plan.reason, /team\.billing\.plan=hobby/);
+    assert.equal(out.commandScope.cliScope, 'fixture');
+    assert.equal(out.commandScope.source, 'team-api');
     assert.deepEqual(out.contract, { context: 'fixture', commitments: [], totalCommitments: 0 });
     assert.equal(out.usageError, null);
     assert.doesNotMatch(stderr, /unexpected vercel call/);
+    assert.doesNotMatch(stderr, /missing expected scope/);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test('collect-signals: scopes metrics, contract, and usage to the linked team slug', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'vo-command-scope-'));
+  const bin = join(scratch, 'bin');
+  try {
+    await mkdir(bin, { recursive: true });
+    await mkdir(join(scratch, '.vercel'), { recursive: true });
+    await writeFile(join(scratch, 'package.json'), JSON.stringify({
+      dependencies: { next: '^15.3.0' },
+    }), 'utf-8');
+    await writeFile(join(scratch, '.vercel', 'project.json'), JSON.stringify({
+      projectId: 'prj_scope',
+      orgId: 'team_scope',
+    }), 'utf-8');
+    const fakeVercel = join(bin, 'vercel');
+    await writeFile(fakeVercel, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+function json(value, code = 0) {
+  process.stdout.write(JSON.stringify(value, null, 2) + '\\n');
+  process.exit(code);
+}
+function requireScope(expected) {
+  const i = args.indexOf('--scope');
+  if (i === -1 || args[i + 1] !== expected || args.includes('team_scope')) {
+    process.stderr.write('missing expected scope ' + expected + ': ' + args.join(' ') + '\\n');
+    process.exit(67);
+  }
+}
+if (args[0] === '--version') {
+  process.stdout.write('54.1.0\\n');
+  process.exit(0);
+}
+if (args[0] === 'whoami' && args[1] === '--format') {
+  json({
+    username: 'test-user',
+    team: { id: 'team_other', slug: 'other-team', name: 'Other Team' },
+  });
+}
+if (args[0] === 'whoami') {
+  process.stdout.write('test-user\\n');
+  process.exit(0);
+}
+if (args[0] === 'api') {
+  const path = args[1];
+  if (path.startsWith('/v1/observability/manage/configuration/projects')) {
+    json({ disabledProjects: [] });
+  }
+  if (path === '/v9/projects/prj_scope?teamId=team_scope') {
+    json({ id: 'prj_scope', name: 'fixture-site' });
+  }
+  if (path === '/v2/teams/team_scope') {
+    json({ id: 'team_scope', slug: 'team-scope', billing: { plan: 'pro' } });
+  }
+}
+if (args[0] === 'metrics') {
+  requireScope('team-scope');
+  json({ summary: [], data: [], statistics: {} });
+}
+if (args[0] === 'contract') {
+  requireScope('team-scope');
+  json({ context: 'team-scope', commitments: [], totalCommitments: 0 });
+}
+if (args[0] === 'usage') {
+  requireScope('team-scope');
+  json({
+    context: 'team-scope',
+    groupBy: {
+      dimension: 'project',
+      data: [{
+        projectId: 'prj_scope',
+        name: 'fixture-site',
+        services: [{ name: 'Function Invocations', billedCost: 3 }],
+        totals: { billedCost: 3 },
+      }],
+    },
+    services: [{ name: 'Function Invocations', billedCost: 3 }],
+    totals: { billedCost: 3 },
+  });
+}
+process.stderr.write('unexpected vercel call: ' + args.join(' ') + '\\n');
+process.exit(66);
+`, 'utf-8');
+    await chmod(fakeVercel, 0o755);
+
+    const { stdout, stderr } = await exec('node', [COLLECT], {
+      cwd: scratch,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    const out = JSON.parse(stdout);
+    assert.equal(out.commandScope.cliScope, 'team-scope');
+    assert.equal(out.commandScope.source, 'team-api');
+    assert.equal(out.usageScope, 'project');
+    assert.equal(out.usageError, null);
+    assert.equal(out.usage.project.projectId, 'prj_scope');
+    assert.match(out.plan.reason, /team\.billing\.plan=pro/);
+    assert.doesNotMatch(stderr, /unexpected vercel call/);
+    assert.doesNotMatch(stderr, /missing expected scope/);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
@@ -168,7 +282,7 @@ if (args[0] === 'api') {
   if (path === '/v9/projects/prj_test') {
     json({ id: 'prj_test', name: 'fixture-site' });
   }
-  if (path === '/v2/teams/team_current') {
+  if (path === '/v2/teams/current-team') {
     json({ id: 'team_current', slug: 'current-team', billing: { plan: 'pro' } });
   }
   if (path === '/v2/user') {

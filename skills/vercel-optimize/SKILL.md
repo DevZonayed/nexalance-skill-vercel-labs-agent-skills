@@ -21,7 +21,7 @@ Core doctrine: read [references/doctrine.md](references/doctrine.md) if any rule
 
 - Vercel CLI v53+ with `vercel metrics`, `vercel usage`, `vercel contract`, and `vercel api`.
 - Authenticated CLI session: `vercel login`.
-- Linked app directory: `vercel link`. `VERCEL_PROJECT_ID` can help resolve project config, but `vercel metrics` still requires directory linkage.
+- Linked app directory: `vercel link`. `VERCEL_PROJECT_ID` can help resolve project config, but `vercel metrics` still requires directory linkage. For team projects, the link or environment must include the project org/team so the collector can resolve a CLI-safe `--scope` and keep `vercel metrics`, `vercel usage`, and `vercel contract` on the same team.
 - Node.js 20+.
 - Observability Plus for route-level metric-backed recommendations.
 
@@ -73,6 +73,8 @@ node scripts/merge-signals.mjs "$RUN_DIR/vercel-signals.json" "$RUN_DIR/codebase
 ```
 
 Collection details, schemas, metric IDs, and degradation behavior live in [references/data-collection.md](references/data-collection.md). The metric registry is [lib/queries.mjs](lib/queries.mjs); keep all queries on the shared 14-day window.
+
+`collect-signals.mjs` resolves the linked project team to `commandScope.cliScope`; downstream scripts reuse that scope for every Vercel CLI command that accepts `--scope`. Do not run `vercel usage`, `vercel metrics`, or `vercel contract` manually without the same scope; unscoped usage can report the user's personal organization while route metrics come from the team project.
 
 ### 1.1 Stop on blockers
 
@@ -158,7 +160,7 @@ node scripts/reconcile-candidates.mjs "$RUN_DIR/investigation-evidence.json" \
   --out "$RUN_DIR/reconciled-investigation.json"
 ```
 
-`--cwd` must be the linked project directory so `vercel metrics` resolves the right project/team.
+`--cwd` must be the linked project directory so `deep-dive.mjs` can verify the same project link and reuse `signals.json.commandScope.cliScope` for any follow-up `vercel metrics` calls.
 
 Reconciliation deterministically converts disproven candidates into observations before any source investigation:
 

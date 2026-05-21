@@ -7,6 +7,7 @@ import {
   checkCliVersion,
   checkAuth,
   resolveProjectId,
+  resolveCommandScope,
   hasObservabilityPlus,
   checkObservabilityPlusConfiguration,
   getMetricsSchema,
@@ -74,8 +75,6 @@ async function main() {
   }
   log(`project link resolved (source=${project.source}; teamScope=${project.orgId ? 'yes' : 'no'})`);
 
-  const scope = project.orgId || undefined;
-
   log('checking framework support…');
   const stack = await detectStack();
   const frameworkSupport = classifyFrameworkSupport(stack);
@@ -89,6 +88,7 @@ async function main() {
       projectId: project.projectId,
       orgId: project.orgId,
       projectIdSource: project.source,
+      commandScope: null,
       frameworkSupport,
       frameworkSupportBlocker: frameworkSupport.blocker,
       frameworkSupportDetail: frameworkSupport.detail,
@@ -117,6 +117,14 @@ async function main() {
   if (!frameworkSupport.ok && continueUnsupportedFramework) {
     log('continuing after unsupported framework blocker because --continue-unsupported-framework was set');
   }
+
+  log('resolving Vercel CLI command scope…');
+  const commandScope = await resolveCommandScope(project);
+  if (!commandScope.ok) {
+    throw new Error(`SCOPE_UNRESOLVED: ${commandScope.detail} Run \`vercel switch <team>\` or re-link with \`vercel link --yes --project <project-name-or-id> --team <team-slug>\`.`);
+  }
+  const scope = commandScope.cliScope || undefined;
+  log(`command scope resolved (source=${commandScope.source}; scoped=${scope ? 'yes' : 'no'})`);
 
   log('checking Observability Plus configuration…');
   const observabilityPlusConfig = await checkObservabilityPlusConfiguration({
@@ -186,6 +194,7 @@ async function main() {
       projectId: project.projectId,
       orgId: project.orgId,
       projectIdSource: project.source,
+      commandScope,
       observabilityPlus: oplus,
       observabilityPlusPreflight: observabilityPlusConfig,
       observabilityPlusUsable: oplusDiag.usable,
@@ -218,7 +227,7 @@ async function main() {
   log('pulling project config + account plan + contract + usage in parallel…');
   const [projectCfg, accountPlan, contract, usageResult] = await Promise.all([
     getProjectConfig(project.projectId, project.orgId),
-    getAccountPlan(scope),
+    getAccountPlan(project.orgId || scope),
     getContract(scope),
     getUsage({ days: 14, scope }),
   ]);
@@ -300,6 +309,7 @@ async function main() {
     projectId: project.projectId,
     orgId: project.orgId,
     projectIdSource: project.source,
+    commandScope,
     observabilityPlus: oplus,
     observabilityPlusPreflight: observabilityPlusConfig,
     observabilityPlusUsable: oplusDiag.usable,
